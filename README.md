@@ -54,10 +54,11 @@ M5 外观与系统集成：
   `ParamHistory.txt`、`ALTRun.ini`（含 `[DEBUG] LatestList`）
 - 绿色便携：所有配置与数据都在 exe 同目录，不写注册表配置
 - 中文界面与 IME 输入、Win11 圆角暗色窗口
-- 多语言：`[GUI] Lang=EN` / `简体中文` 整窗切换（5 个窗口 + 托盘 + 默认列表名）；
-  原版 `.lang` 的 224 键内置在可执行文件里，没有语言文件也能用
-- M5：JPG/PNG/BMP 皮肤、字体串解析、多语言 `.lang`、Popup.wav、SendTo 快捷方式、关于窗口
-- M6：720 项核心单元测试、CTest、GBK 兼容验证、可复现的 win64 便携版打包脚本
+- 三种内置语言：`[GUI] Lang=zh_cn` / `zh_hk` / `en_us`，整窗切换
+  （5 个窗口 + 托盘 + 默认列表名）；原版 224 键三语言表内置，不再读取外置
+  `.lang` 或 `About.<Lang>` 文件，旧 `EN` / `简体中文` 配置自动迁移
+- M5：JPG/PNG/BMP 皮肤、字体串解析、Popup.wav、SendTo 快捷方式、关于窗口
+- M6：1024 项核心单元测试、CTest、GBK 兼容验证、可复现的 win64 便携版打包脚本
 
 ## 构建
 

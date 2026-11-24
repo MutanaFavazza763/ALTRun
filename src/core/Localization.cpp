@@ -3,23 +3,19 @@
 #include <windows.h>
 
 #include <cstddef>
-#include <iterator>
-#include <string_view>
-#include <utility>
+#include <string>
 
-#include "core/Encoding.h"
 #include "core/Logger.h"
 #include "core/Text.h"
 
 namespace alt {
 namespace {
 
-constexpr long long kMaxLanguageFileBytes = 8 * 1024 * 1024;
-
 struct BuiltinText {
     const char* key;
     const wchar_t* en;
     const wchar_t* zh;
+    const wchar_t* zh_hk = nullptr;
 };
 
 // Keys that exist only in the rewrite (no counterpart in the legacy .lang):
@@ -61,8 +57,6 @@ constexpr BuiltinText kRewriteBuiltins[] = {
     {"resAboutIniPath", L"Settings file: ", L"配置文件："},
     {"resAboutDataDir", L"Data directory: ", L"数据目录："},
     {"resAboutContent", L"About text: ", L"关于文本："},
-    {"resAboutContentMissing", L" (file missing, built-in text shown)",
-     L"（文件不存在，显示内置文本）"},
     {"resAboutFallback",
      L"ALTRun 2.0 is a C++20 / Win32 / Direct2D rewrite of the original ALTRun.\r\n"
      L"\r\n"
@@ -208,40 +202,19 @@ constexpr BuiltinText kRewriteBuiltins[] = {
     {"resTestErrorCode", L"\r\nError code: ", L"\r\n错误码："},
 };
 
-// All 224 keys of the legacy language files (8 sections, 中文 + English), so the
-// fallback is complete even when no <Lang>.lang sits next to the executable.
+// All 224 keys of the legacy language files (8 sections, en_us / zh_cn / zh_hk).
 // Regenerate with 08-tools/generate_builtin_table.py after changing the legacy
-// language files; do not hand-edit the include.
+// source tables; do not hand-edit the include.
 #include "core/LocalizationBuiltin.inc"
 
-std::wstring ExecutableDirectory() {
-    wchar_t path[MAX_PATH * 2] = {};
-    ::GetModuleFileNameW(nullptr, path, static_cast<DWORD>(std::size(path)));
-    std::wstring text = path;
-    const size_t slash = text.find_last_of(L"\\/");
-    if (slash != std::wstring::npos) {
-        text.resize(slash + 1);
+void ReplaceAll(std::wstring* text, const wchar_t* from, const wchar_t* to) {
+    const std::wstring source(from);
+    const std::wstring target(to);
+    size_t at = 0;
+    while ((at = text->find(source, at)) != std::wstring::npos) {
+        text->replace(at, source.size(), target);
+        at += target.size();
     }
-    return text;
-}
-
-std::wstring DecodeUtf16Le(std::string_view bytes) {
-    if (bytes.size() < 2) {
-        return {};
-    }
-    const size_t count = bytes.size() / sizeof(wchar_t);
-    return std::wstring(reinterpret_cast<const wchar_t*>(bytes.data()), count);
-}
-
-std::wstring DecodeUtf16Be(std::string_view bytes) {
-    std::wstring wide;
-    wide.reserve(bytes.size() / 2);
-    for (size_t i = 0; i + 1 < bytes.size(); i += 2) {
-        const auto high = static_cast<unsigned char>(bytes[i]);
-        const auto low = static_cast<unsigned char>(bytes[i + 1]);
-        wide.push_back(static_cast<wchar_t>((high << 8) | low));
-    }
-    return wide;
 }
 
 }  // namespace
@@ -254,48 +227,46 @@ Localization& Localization::Instance() {
 Localization::Localization() = default;
 
 bool Localization::Load(const std::string& lang) {
-    const std::string trimmed(TrimAscii(lang));
-    lang_ = trimmed.empty() ? "EN" : trimmed;
-    chinese_ = IsChineseLang(lang_);
-    file_entries_.clear();
-
-    const std::wstring path = ExecutableDirectory() + ToWide(lang_) + L".lang";
-    if (::GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES) {
-        // Normal for the built-in English/Chinese fallback: not an error.
-        Logger::Instance().Info("localization: " + ToUtf8(path) +
-                                " not found, using built-in " +
-                                (chinese_ ? "zh" : "en") + " strings");
-        return false;
-    }
-
-    std::string utf8;
-    if (!ReadTextFileUtf8(path, &utf8)) {
-        Logger::Instance().Error("localization: cannot read " + ToUtf8(path));
-        return false;
-    }
-    Parse(utf8);
-    Logger::Instance().Info("localization: loaded " +
-                            std::to_string(file_entries_.size()) +
-                            " entries from " + ToUtf8(path));
+    lang_ = NormalizeLanguage(lang);
+    language_ = lang_ == "zh_cn" ? Language::ZhCn
+                                 : (lang_ == "zh_hk" ? Language::ZhHk
+                                                     : Language::EnUs);
+    Logger::Instance().Info("localization: using built-in " + lang_ + " strings");
     return true;
+}
+
+std::string Localization::NormalizeLanguage(const std::string& lang) {
+    std::string lowered = ToLowerUtf8(TrimAscii(lang));
+    for (char& character : lowered) {
+        if (character == '-') {
+            character = '_';
+        }
+    }
+    if (lowered == "zh_hk" || lowered == "zh_tw" || lowered == "zh_hant" ||
+        lang.find("繁体") != std::string::npos ||
+        lang.find("繁體") != std::string::npos) {
+        return "zh_hk";
+    }
+    if (lowered == "zh" || lowered == "zh_cn" || lowered == "zh_hans" ||
+        lang.find("简体") != std::string::npos ||
+        lang.find("簡體") != std::string::npos) {
+        return "zh_cn";
+    }
+    return "en_us";
 }
 
 std::wstring Localization::Get(const std::string& key) const {
     const std::string lowered = ToLowerUtf8(key);
-    const auto loaded = file_entries_.find(lowered);
-    if (loaded != file_entries_.end()) {
-        return loaded->second;
-    }
     // Built-in keys keep the original spelling; lookups are case-insensitive,
     // matching INI/profile API semantics.
     for (const BuiltinText& entry : kRewriteBuiltins) {
         if (IEqualsAscii(lowered, entry.key)) {
-            return chinese_ ? entry.zh : entry.en;
+            return SelectText(entry.en, entry.zh);
         }
     }
     for (const BuiltinText& entry : kOriginalBuiltins) {
         if (IEqualsAscii(lowered, entry.key)) {
-            return chinese_ ? entry.zh : entry.en;
+            return SelectText(entry.en, entry.zh, entry.zh_hk);
         }
     }
     // A bare legacy key ("ConfigList_0") resolves to its "Section.Key" entry;
@@ -307,126 +278,88 @@ std::wstring Localization::Get(const std::string& key) const {
             const size_t dot = name.find('.');
             if (dot != std::string::npos && dot + 1 < name.size() &&
                 IEqualsAscii(lowered, name.substr(dot + 1))) {
-                return chinese_ ? entry.zh : entry.en;
+                return SelectText(entry.en, entry.zh, entry.zh_hk);
             }
         }
     }
     return ToWide(key);
 }
 
-bool Localization::IsChineseLang(const std::string& lang) {
-    const std::string lowered = ToLowerUtf8(lang);
-    if (lowered.rfind("zh", 0) == 0) {
-        return true;
+std::wstring Localization::SelectText(const wchar_t* en_us,
+                                      const wchar_t* zh_cn,
+                                      const wchar_t* zh_hk) const {
+    if (language_ == Language::EnUs) {
+        return en_us;
     }
-    // 简体中文 / 繁体中文 as plain UTF-8 language names (the legacy ini value).
-    return lang.find("中文") != std::string::npos;
+    if (language_ == Language::ZhCn) {
+        return zh_cn;
+    }
+    // A few entries in the legacy Traditional file were left in Simplified
+    // Chinese (e.g. ConfigList_0); normalise glyphs even for native zh_hk text.
+    return ToTraditionalChinese(zh_hk != nullptr ? zh_hk : zh_cn);
 }
 
-void Localization::Parse(const std::string& utf8) {
-    std::string section;
-    size_t start = 0;
-    while (start <= utf8.size()) {
-        size_t next = utf8.find('\n', start);
-        const bool last_line = next == std::string::npos;
-        if (last_line) {
-            next = utf8.size();
-        }
-        std::string_view line(utf8.data() + start, next - start);
-        start = next + 1;
-        if (!line.empty() && line.back() == '\r') {
-            line.remove_suffix(1);
-        }
-        line = TrimAscii(line);
-        if (line.empty() || line.front() == ';' || line.front() == '#') {
-            if (last_line) {
-                break;
-            }
-            continue;
-        }
-        if (line.front() == '[') {
-            const size_t close = line.find(']');
-            if (close != std::string_view::npos) {
-                section = ToLowerUtf8(TrimAscii(line.substr(1, close - 1)));
-            }
-        } else {
-            const size_t equals = line.find('=');
-            if (equals != std::string_view::npos) {
-                const std::string key(
-                    ToLowerUtf8(TrimAscii(line.substr(0, equals))));
-                const std::wstring value(
-                    ToWide(TrimAscii(line.substr(equals + 1))));
-                if (!key.empty()) {
-                    if (!section.empty()) {
-                        file_entries_.emplace(section + "." + key, value);
-                    }
-                    file_entries_.emplace(key, value);
-                }
-            }
-        }
-        if (last_line) {
-            break;
-        }
+std::wstring Localization::ToTraditionalChinese(std::wstring text) {
+    if (text.empty()) {
+        return text;
     }
-}
 
-bool Localization::ReadTextFileUtf8(const std::wstring& path, std::string* utf8) {
-    if (utf8 == nullptr || path.empty()) {
-        return false;
+    // LCMapStringEx converts characters, not vocabulary.  Apply the common
+    // Windows UI terms first so zh_hk reads like a Traditional Chinese desktop
+    // application rather than a glyph-only conversion of the Simplified text.
+    // Longer/more specific phrases must precede their substrings.
+    static constexpr struct {
+        const wchar_t* simplified;
+        const wchar_t* traditional;
+    } kTerms[] = {
+        {L"快捷方式", L"捷徑"},
+        {L"快捷项", L"捷徑"},
+        {L"配置文件", L"設定檔"},
+        {L"文件夹", L"資料夾"},
+        {L"文件", L"檔案"},
+        {L"命令行", L"命令列"},
+        {L"显示名", L"顯示名稱"},
+        {L"默认", L"預設"},
+        {L"设置", L"設定"},
+        {L"保存", L"儲存"},
+        {L"导入", L"匯入"},
+        {L"导出", L"匯出"},
+        {L"运行", L"執行"},
+        {L"窗口", L"視窗"},
+        {L"菜单", L"選單"},
+        {L"字体", L"字型"},
+        {L"数据", L"資料"},
+        {L"程序", L"程式"},
+        {L"信息", L"資訊"},
+        {L"用户", L"使用者"},
+        {L"支持", L"支援"},
+        {L"字符", L"字元"},
+        {L"热键", L"快速鍵"},
+        {L"粘贴", L"貼上"},
+        {L"链接", L"連結"},
+        {L"列表", L"清單"},
+        {L"添加", L"新增"},
+        {L"创建", L"建立"},
+    };
+    for (const auto& term : kTerms) {
+        ReplaceAll(&text, term.simplified, term.traditional);
     }
-    utf8->clear();
 
-    HANDLE file = ::CreateFileW(path.c_str(), GENERIC_READ,
-                                FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (file == INVALID_HANDLE_VALUE) {
-        return false;
+    const int source_length = static_cast<int>(text.size());
+    const int required = ::LCMapStringEx(
+        L"zh-CN", LCMAP_TRADITIONAL_CHINESE, text.data(), source_length, nullptr,
+        0, nullptr, nullptr, 0);
+    if (required <= 0) {
+        return text;
     }
-    LARGE_INTEGER size = {};
-    if (::GetFileSizeEx(file, &size) == FALSE || size.QuadPart < 0 ||
-        size.QuadPart > kMaxLanguageFileBytes) {
-        ::CloseHandle(file);
-        return false;
+    std::wstring converted(static_cast<size_t>(required), L'\0');
+    const int written = ::LCMapStringEx(
+        L"zh-CN", LCMAP_TRADITIONAL_CHINESE, text.data(), source_length,
+        converted.data(), required, nullptr, nullptr, 0);
+    if (written != required) {
+        return text;
     }
-    std::string bytes(static_cast<size_t>(size.QuadPart), '\0');
-    if (!bytes.empty()) {
-        DWORD read = 0;
-        if (::ReadFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &read,
-                       nullptr) == FALSE) {
-            ::CloseHandle(file);
-            return false;
-        }
-        bytes.resize(read);
-    }
-    ::CloseHandle(file);
-
-    // Encoding detection matches ShortcutStore::Load()/the manager import:
-    // BOM first, then strict UTF-8, otherwise the legacy ANSI/GBK code page.
-    if (bytes.size() >= 3 && static_cast<unsigned char>(bytes[0]) == 0xEF &&
-        static_cast<unsigned char>(bytes[1]) == 0xBB &&
-        static_cast<unsigned char>(bytes[2]) == 0xBF) {
-        bytes.erase(0, 3);
-        *utf8 = std::move(bytes);
-        return true;
-    }
-    if (bytes.size() >= 2 && static_cast<unsigned char>(bytes[0]) == 0xFF &&
-        static_cast<unsigned char>(bytes[1]) == 0xFE) {
-        *utf8 = ToUtf8(DecodeUtf16Le(
-            std::string_view(bytes).substr(2)));
-        return true;
-    }
-    if (bytes.size() >= 2 && static_cast<unsigned char>(bytes[0]) == 0xFE &&
-        static_cast<unsigned char>(bytes[1]) == 0xFF) {
-        *utf8 = ToUtf8(DecodeUtf16Be(
-            std::string_view(bytes).substr(2)));
-        return true;
-    }
-    if (IsValidUtf8(bytes)) {
-        *utf8 = std::move(bytes);
-    } else {
-        *utf8 = AnsiToUtf8(bytes);
-    }
-    return true;
+    return converted;
 }
 
 }  // namespace alt

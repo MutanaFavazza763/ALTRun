@@ -88,9 +88,8 @@ int App::Run() {
     Logger::Instance().SetEnabled(settings_.trace_enabled);
     Logger::Instance().Info("ALTRun starting, exe=" + ToUtf8(ExePath()));
 
-    // Language resources (file <Lang>.lang, built-in fallback) must be ready
-    // before any window is shown; changing Lang later re-runs this in
-    // ApplySettings().
+    // Built-in language resources must be ready before any window is shown;
+    // changing Lang later re-runs this in ApplySettings().
     Localization::Instance().Load(settings_.lang);
     // AddToSendTo is a system integration that is re-applied on every startup
     // (idempotent), exactly like the original.
@@ -362,8 +361,8 @@ void App::ApplySettings() {
 
     Logger::Instance().SetEnabled(settings_.trace_enabled);
     ApplyAutoRun(settings_.auto_run);
-    // Language may have changed (ConfigWindow writes [GUI] Lang): reload the
-    // .lang file / built-in fallback before the launcher re-renders.
+    // Language may have changed (ConfigWindow writes [GUI] Lang): select the
+    // new built-in locale before the launcher re-renders.
     Localization::Instance().Load(settings_.lang);
     // AddToSendTo must take effect immediately when the checkbox is toggled.
     ShellIntegration::ApplyAddToSendTo(settings_.add_to_send_to, ExePath());

@@ -13,10 +13,10 @@ namespace alt {
 //
 // Native controls like ConfigWindow: popup/topmost/tool-window, created once by
 // App and reused.  Shows the rewrite version, the original project URL, the
-// ShortCutRunCount statistic, the ini/data locations and the free-form
-// <exe目录>\About.<Lang> text (read-only multiline EDIT with scrolling; the
-// built-in text is used when the file is missing).  Esc / the close button /
-// WM_CLOSE only hide the window, so it can be reopened without rebuilding.
+// ShortCutRunCount statistic, the ini/data locations and the built-in about
+// text for the current locale (read-only multiline EDIT with scrolling).
+// Esc / the close button / WM_CLOSE only hide the window, so it can be reopened
+// without rebuilding.
 class AboutWindow : public Window {
 public:
     explicit AboutWindow(Settings& settings);
@@ -24,7 +24,7 @@ public:
 
     bool CreateAboutWindow(HINSTANCE instance);
 
-    // Re-reads About.<Lang> and the dynamic values, then shows the window.
+    // Refreshes the built-in about text and dynamic values, then shows the window.
     void Open();
     // Refreshes texts without showing (used by App::ApplySettings after a
     // language / shortcut-count change).
@@ -44,7 +44,6 @@ private:
     void ApplyFont(HWND control) const;
     void PlaceOnCursorMonitor();
     void DrawHeader(HDC dc) const;
-    std::wstring AboutFilePath() const;
     void LoadAboutText();
 
     static LRESULT CALLBACK ChildSubclassProc(HWND hwnd, UINT message,

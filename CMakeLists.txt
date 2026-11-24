@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(ALTRun
-    VERSION 2.0.2
+    VERSION 2.0.3
     DESCRIPTION "ALTRun - an alternative Run. Fast launcher for Windows."
     LANGUAGES CXX)
 

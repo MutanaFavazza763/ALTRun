@@ -12,5 +12,6 @@ Planned contents (mirrors the original `Bin/` folder):
 | `res/Popup.wav` | The "popup" notification sound (`PlayPopupNotify`) |
 | `res/ALTRun.ico` | Tray / window icon |
 
-Nothing here is required at runtime yet: the launcher falls back to a solid
-dark background and built-in Chinese strings when a resource is missing.
+Nothing here is required at runtime: the launcher falls back to a solid dark
+background, and all three UI locales (`zh_cn`, `zh_hk`, `en_us`) are built into
+the executable.  External `.lang` files are not loaded.

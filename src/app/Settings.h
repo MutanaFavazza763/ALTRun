@@ -51,7 +51,7 @@ struct Settings {
     std::string title_font = "Segoe UI|[]|12|65535|0";    // TitleFont
     std::string keyword_font = "Segoe UI|[]|12|255|0";    // KeywordFont
     std::string list_font = "Segoe UI|[]|12|8388608|0";   // ListFont
-    std::string lang = "EN";              // Lang
+    std::string lang = "en_us";           // Lang: zh_cn / zh_hk / en_us
     std::string list_format = "%-25s| %s";  // ListFormat
     int alpha = 240;                      // Alpha
     int round_border_radius = 12;         // RoundBorderRadius

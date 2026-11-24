@@ -5,6 +5,7 @@
 #include <string>
 
 #include "core/Encoding.h"
+#include "core/Localization.h"
 #include "core/Logger.h"
 #include "core/Text.h"
 
@@ -225,7 +226,7 @@ void Settings::Load() {
     title_font = ReadString(ini, L"GUI", L"TitleFont", title_font);
     keyword_font = ReadString(ini, L"GUI", L"KeywordFont", keyword_font);
     list_font = ReadString(ini, L"GUI", L"ListFont", list_font);
-    lang = ReadString(ini, L"GUI", L"Lang", lang);
+    lang = Localization::NormalizeLanguage(ReadString(ini, L"GUI", L"Lang", lang));
     list_format = ReadString(ini, L"GUI", L"ListFormat", list_format);
     alpha = ReadInt(ini, L"GUI", L"Alpha", alpha);
     round_border_radius = ReadInt(ini, L"GUI", L"RoundBorderRadius", round_border_radius);
@@ -276,7 +277,7 @@ bool Settings::Save() const {
     WriteStr(ini, L"GUI", L"TitleFont", title_font);
     WriteStr(ini, L"GUI", L"KeywordFont", keyword_font);
     WriteStr(ini, L"GUI", L"ListFont", list_font);
-    WriteStr(ini, L"GUI", L"Lang", lang);
+    WriteStr(ini, L"GUI", L"Lang", Localization::NormalizeLanguage(lang));
     WriteStr(ini, L"GUI", L"ListFormat", list_format);
     WriteInt(ini, L"GUI", L"Alpha", alpha);
     WriteInt(ini, L"GUI", L"RoundBorderRadius", round_border_radius);

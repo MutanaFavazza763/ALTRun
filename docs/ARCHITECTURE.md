@@ -40,8 +40,8 @@ src/
 │  ├─ Encoding.{h,cpp}      GBK ⇄ UTF-8、UTF-8 严格校验
 │  ├─ Text.{h,cpp}          UTF-8 ⇄ UTF-16、ASCII 大小写折叠
 │  ├─ FontSpec.{h,cpp}      旧版字体串 `字体名|[]|12|65535|0` 解析/序列化
-│  ├─ Localization.{h,cpp}  `<Lang>.lang` 加载 + 内置 224 键 EN/中文回退
-│  ├─ LocalizationBuiltin.inc  224 键内置表（由 08-tools 脚本生成，勿手改）
+│  ├─ Localization.{h,cpp}  三种内置语言（zh_cn / zh_hk / en_us）
+│  ├─ LocalizationBuiltin.inc  原版 224 键三语言表（由 08-tools 脚本生成，勿手改）
 │  ├─ Shortcut.{h,cpp}      快捷项模型 + ParamType 映射
 │  ├─ ShortcutSource.{h,cpp} 路径/URL/命令行 → 关键字推导、.lnk 解析、相对路径
 │  ├─ ShortcutStore.{h,cpp} ShortCutList.txt / FavoriteList.txt / LatestList
@@ -55,7 +55,7 @@ src/
    ├─ UiText.h              `Loc(key)` / `LocArg` / `LocArgInt`：全 UI 统一取词入口
    ├─ D2DContext.{h,cpp}    D2D/DWrite 资源封装（设备丢失重建）
    ├─ SkinImage.{h,cpp}     WIC 解码皮肤图（JPG/PNG/BMP）→ ID2D1Bitmap
-   ├─ AboutWindow.{h,cpp}   关于窗口（版本、About.<Lang> 正文）
+   ├─ AboutWindow.{h,cpp}   关于窗口（版本、内置三语言正文）
    ├─ MainWindow.{h,cpp}    启动器窗口：输入、结果列表、绘制、键盘/IME
    ├─ ParamWindow.{h,cpp}   参数提示窗：单行编辑 + 历史下拉 + 空闲取消
    ├─ ConfigWindow.{h,cpp}  设置窗口：原生分页控件（4 页）+ 热键捕获
@@ -214,23 +214,25 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
   设备丢失重建 render target 后会重新加载位图。
 - **字体**：`TitleFont/KeywordFont/ListFont` 沿用旧版五段格式（`Family|StyleSet|Size|TColor|Charset`），
   `FontSpec` 容错解析后用于创建 `IDWriteTextFormat`（磅值 → DIP 直接可用；`[fsBold]` → 粗体）。
-- **多语言**：`Localization` 读取 `<exe目录>\<Lang>.lang`（INI 风格，UTF-8/BOM/GBK/UTF-16 均可），
-  键查找顺序为 **`.lang` 文件 → 重写独有 `res*` 表 → 原版 224 键内置表 →（裸键时）按
-  `Section.Key` 后缀回退 → 键名本身**。内置的 224 条来自 `05-original-delphi-source/Bin`
-  的 `EN.lang` / `简体中文.lang`（8 个 section、键集完全一致），由
-  `08-tools/generate_builtin_table.py` 生成到 `LocalizationBuiltin.inc`，所以没有任何
-  `.lang` 文件时界面也能整段切换；自带 `.lang` 时该文件仍然逐键覆盖。
+- **三种内置语言**：`[GUI] Lang` 只接受 `zh_cn`、`zh_hk`、`en_us`，不再读取任意
+  `<Lang>.lang` 或 `About.<Lang>` 外置文件。`NormalizeLanguage()` 会把旧配置的
+  `EN` / `简体中文` / `繁体中文` 以及 `zh-HK` 等写法归一化；未知值回退 `en_us`，保存时写回规范值。
+  键查找顺序为 **重写独有 `res*` 表 → 原版 224 键内置表 →（裸键时）按 `Section.Key`
+  后缀回退 → 键名本身**。224 条来自 `05-original-delphi-source/Bin` 的
+  `EN.lang` / `简体中文.lang` / `繁体中文.lang`（8 个 section、键集完全一致），由
+  `08-tools/generate_builtin_table.py` 生成到 `LocalizationBuiltin.inc`；原版繁体表中
+  残留的简体字会在运行时统一转繁。71 个 `res*` 键的繁体由 Windows
+  `LCMAP_TRADITIONAL_CHINESE` + 常见桌面术语替换生成。
   UI 侧统一走 `ui/UiText.h` 的 `Loc(key)`（`LocArg`/`LocArgInt` 处理带一个 `%s`/`%d`
-  的旧模板）。原版有对应键的照抄原版键（连措辞一起对齐），重写新增的控件用 `res*`
-  键；`ShortcutStore` 首次生成的默认列表名取自 `[DefaultShortCutName]`，因此中文
-  会写出"我的电脑"这类旧名（GBK 落盘，与旧版逐字节兼容），英文会写出 `My Computer`。
-  修改 `Lang` 并确定后立即重新加载（无需重启）。
+  的旧模板）。`ShortcutStore` 首次生成的默认列表名取自 `[DefaultShortCutName]`，因此
+  `zh_cn` 写"我的电脑"，`zh_hk` 写"我的電腦"，`en_us` 写 `My Computer`（GBK 落盘，
+  三种语言均已实测无丢字）。修改 `Lang` 并确定后立即重新加载，无需重启。
 - **提示音**：`ShowLauncher()` 成功后按 `PlayPopupNotify` 播放 `<exe目录>\Popup.wav`
   （`PlaySoundW`，`SND_ASYNC|SND_NODEFAULT`，缺失静默）。
 - **发送到菜单**：`AddToSendTo=1` 时用 `IShellLinkW` 在
   `%APPDATA%\Microsoft\Windows\SendTo\ALTRun.lnk` 创建/重建快捷方式，关闭时删除；设置里改完立即生效。
-- **关于窗口**：版本、原版仓库链接、`ShortCutRunCount`、ini/数据目录、`About.<Lang>` 自由文本
-  （原生只读多行 EDIT + 滚动），缺失时用内置文本。托盘菜单"关于(&A)"打开，`--about` 便于开发查看。
+- **关于窗口**：版本、原版仓库链接、`ShortCutRunCount`、ini/数据目录、当前语言的内置正文
+  （原生只读多行 EDIT + 滚动）。托盘菜单"关于(&A)"打开，`--about` 便于开发查看。
 
 ## 11. 窗口与交互
 
@@ -276,7 +278,8 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | D23 | 关于窗 420×360（原版约 420×320） | 为容纳 7 行信息 + 可滚动正文 |
 | D24 | 唤出前检测虚拟桌面，必要时**重建**主窗（`DesktopSpace` + `App::RecreateMainWindow`） | Windows 无法把窗口搬到别的虚拟桌面；原版是 VCL `Show` 同样受此限制（表现为"热键没反应"）。重建后热键与托盘迁移到新 hwnd，查询失败时 fail-open 不重建 |
 | D25 | `ALTRun.ini` 若为 UTF-8 则启动时原地转 UTF-16 | Windows profile API 只认 ANSI 或带 BOM 的 UTF-16；Win11 记事本默认存 UTF-8，会让中文 `Lang`/字体名全变乱码。老 ANSI/GBK 文件不动，写回后仍由 profile API 维护 UTF-16 格式 |
-| D26 | 内置原版全部 224 键，并新增 72 个 `res*` 键；默认列表名走 `[DefaultShortCutName]` | 原版 `EN.lang`/`简体中文.lang` 各 224 键且键集一致，内置后可无文件切换；重写独有的控件文案（导入导出、参数提示、调试页等）在原版没有对应键，用 `res*` 补齐。默认列表的显示名本地化后，中文仍是旧名（GBK），英文为新译名——与原版"按当前语言写默认名"的行为一致 |
+| D26 | 内置原版全部 224 键，并新增 71 个 `res*` 键；默认列表名走 `[DefaultShortCutName]` | 原版语言文件的键集一致，内置后无需任何语言文件；重写独有的控件文案用 `res*` 补齐。默认列表的显示名按当前内置语言生成（GBK），与原版"按当前语言写默认名"的行为一致 |
+| D27 | 只支持 `zh_cn` / `zh_hk` / `en_us` 三种内置语言，不再加载 `.lang` 或 `About.<Lang>` | 用户明确要求收敛语言范围；旧 `Lang=EN/简体中文/繁体中文` 自动迁移，未知值回退 `en_us`，避免外置语言包造成 UI 不一致 |
 
 ## 13. 构建、测试与打包
 
@@ -287,7 +290,7 @@ cmake --build build/vs --config Release
 
 # 产物：build/vs/Release/ALTRun.exe + altRunTests.exe（res/ 会一并复制）
 .\build\vs\Release\ALTRun.exe --show      # 开发期直接展示启动器
-.\build\vs\Release\altRunTests.exe        # 核心单元测试（720 项断言）
+.\build\vs\Release\altRunTests.exe        # 核心单元测试（1024 项断言）
 ctest --test-dir build/vs -C Release      # 或通过 CTest 运行
 
 # 便携版打包（exe + res + 文档 + 样例 ALTRun.ini → dist/ALTRun-<版本>-win64.zip）
@@ -302,9 +305,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -Version
 
 单元测试覆盖：GBK ⇄ UTF-8 往返、`ListFormat`/数字前缀/CJK 宽度、通配符→正则、
 打分公式与 `Sort()` 排序键、`ShortCutList.txt` 新旧两种格式解析与序列化往返、
-参数历史淘汰语义、路径/URL/.lnk 关键字推导、字体串容错解析、本地化回退。
+参数历史淘汰语义、路径/URL/.lnk 关键字推导、字体串容错解析、295 个本地化键
+在 `en_us` / `zh_cn` / `zh_hk` 下全部可解析，以及旧语言值归一化。
 
 ## 14. 尚未实现（见 [ROADMAP.md](ROADMAP.md)）
 
-其它窗口（设置/管理器/编辑/参数）的本地化接入、管理器窗口尺寸与列宽记忆、
-单实例唤醒时复用已运行实例的窗口、CI 配置。
+管理器窗口尺寸与列宽记忆、单实例唤醒时复用已运行实例的窗口、CI 配置。
+语言切换仍需要手改 ini 或在"外观"页输入三个规范值之一。

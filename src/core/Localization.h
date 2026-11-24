@@ -1,52 +1,51 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 
 namespace alt {
 
-// Language resources for the strings this rewrite actually displays.
+// Built-in language resources for the three supported UI locales.
 //
-// Legacy format (docs/spec/02-config-options.md §1.8/§6): <exe目录>\<Lang>.lang
-// is an INI-styled file with [Section] lines and Key=Value entries, 224 keys in
-// the original; keys are looked up here either bare ("MainHint") or fully
-// qualified ("ALTRunForm.MainHint").  Files are usually ANSI/GBK but UTF-8
-// (with or without BOM) and UTF-16 LE/BE are accepted.
+// [GUI] Lang accepts exactly zh_cn, zh_hk and en_us.  Legacy values (EN,
+// 简体中文, 繁體中文 and common zh-*/en spellings) are normalised on load so an
+// existing ALTRun.ini keeps working; Save() writes the canonical lower-case
+// value.  External <Lang>.lang files are deliberately no longer loaded.
 //
-// Lookup order in Get(): loaded .lang file -> rewrite-only keys (res*) ->
-// built-in table for all 224 original keys (EN = English, 简体中文/zh-* =
-// Chinese) -> the key itself.  The built-in 224-key table is generated from the
-// legacy language files by 08-tools/generate_builtin_table.py into
-// LocalizationBuiltin.inc, so the fallback is complete instead of partial.
+// Lookup order in Get(): rewrite-only keys (res*) -> all 224 original keys ->
+// bare-key suffix -> the key itself.  The 224-key table is generated from the
+// legacy Simplified Chinese, Traditional Chinese and English files by
+// 08-tools/generate_builtin_table.py into LocalizationBuiltin.inc.  Only the
+// rewrite-only res* keys derive zh_hk at runtime, using Windows'
+// LCMAP_TRADITIONAL_CHINESE plus UI terminology replacements.
 class Localization {
 public:
     static Localization& Instance();
 
-    // Loads <exe目录>\<lang>.lang (lang is UTF-8, e.g. "EN" or "简体中文").
-    // Returns true only when a file was found and parsed.  On false the
-    // built-in table is used; Get() keeps working either way.
+    // Selects one of the three built-in locales.  Always returns true; unknown
+    // values deliberately fall back to en_us.
     bool Load(const std::string& lang);
 
-    // file value -> built-in value -> key itself.
+    // Converts aliases/legacy values to zh_cn, zh_hk or en_us.
+    static std::string NormalizeLanguage(const std::string& lang);
+
+    // Built-in value -> key itself.
     std::wstring Get(const std::string& key) const;
     // Alias kept for call sites that read like UI text instead of resources.
     std::wstring Text(const std::string& key) const { return Get(key); }
 
     const std::string& lang() const { return lang_; }
 
-    // Decodes a text file to UTF-8 (BOM aware, strict UTF-8 then legacy
-    // ANSI/GBK).  Shared with AboutWindow for About.<Lang>.
-    static bool ReadTextFileUtf8(const std::wstring& path, std::string* utf8);
-
 private:
+    enum class Language { EnUs, ZhCn, ZhHk };
+
     Localization();
 
-    static bool IsChineseLang(const std::string& lang);
-    void Parse(const std::string& utf8);
+    std::wstring SelectText(const wchar_t* en_us, const wchar_t* zh_cn,
+                            const wchar_t* zh_hk = nullptr) const;
+    static std::wstring ToTraditionalChinese(std::wstring text);
 
-    std::string lang_ = "EN";
-    bool chinese_ = false;
-    std::unordered_map<std::string, std::wstring> file_entries_;
+    std::string lang_ = "en_us";
+    Language language_ = Language::EnUs;
 };
 
 }  // namespace alt

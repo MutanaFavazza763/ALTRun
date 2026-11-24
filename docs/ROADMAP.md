@@ -91,25 +91,25 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
       0.74 透明面板保证可读；缺失/`ShowSkin=0` 静默回退纯色）
 - [x] 字体串解析（`TitleFont/KeywordFont/ListFont`：`字体名|样式集|磅值|TColor|字符集`，
       容错解析、五段序列化、`fsBold` → 粗体）
-- [x] 多语言框架（`Localization`：`<Lang>.lang` UTF-8/BOM/GBK/UTF-16，INI 风格；
-      文件 → `res*` 重写表 → 原版 224 键内置表 → 裸键后缀回退 → 键名；主窗口/关于/设置/
-      管理器/编辑/参数窗/托盘/默认列表全部接入，见 M7）
+- [x] 三种内置语言（`Localization`：`zh_cn` / `zh_hk` / `en_us`，不加载外部语言文件；
+      `res*` → 原版 224 键三语言表 → 裸键后缀回退 → 键名；主窗口/关于/设置/
+      管理器/编辑/参数窗/托盘/默认列表全部接入，见 M7/M8）
 - [x] 提示音 `Popup.wav`（`PlayPopupNotify`，`PlaySoundW` 异步，缺失静默）
 - [x] `AddToSendTo`（`%APPDATA%\Microsoft\Windows\SendTo\ALTRun.lnk`，设置里改完立即生效）
-- [x] 关于窗口（版本、原版仓库链接、`ShortCutRunCount`、ini/数据目录、`About.<Lang>` 正文；
+- [x] 关于窗口（版本、原版仓库链接、`ShortCutRunCount`、ini/数据目录、内置三语言正文；
       托盘菜单"关于(&A)"与开发用 `--about`）
 - [x] 设置界面外观页新增"背景图片文件名"，改完点确定即重新加载皮肤
 
 验收：设置自定义字体后标题/关键字/列表字号字族变化；放入 `BG.jpg` 后启动器显示皮肤；
-`简体中文.lang` 覆盖内置文案（日志 `localization: loaded N entries`）；`--about` 可打开。
+三种 `Lang` 值均显示对应内置语言；`--about` 可打开。
 
 ## M6 — 质量与发布（✅）
 
-- [x] `altRunTests` 单元测试目标（**720 项断言**，CTest 集成，`-DALTRUN_BUILD_TESTS=OFF` 可关）：
+- [x] `altRunTests` 单元测试目标（**1024 项断言**，CTest 集成，`-DALTRUN_BUILD_TESTS=OFF` 可关）：
       Encoding（GBK 中文往返）、Formatter（ListFormat/前缀/CJK 宽度）、Matcher（通配符转换、
       打分公式、`Sort()` 排序键、大小写、空行跳过）、ShortcutStore（新旧格式解析/序列化往返、
       含 `|` 的命令行）、ParamHistory（rank 递增与最小 rank 淘汰）、ShortcutSource（路径/URL
-      关键字推导、目录名不截断、缺失 .lnk）、FontSpec、Localization（296 键 × 中英文全覆盖）
+      关键字推导、目录名不截断、缺失 .lnk）、FontSpec、Localization（295 键 × 三语言全覆盖）
 - [x] 编码兼容验证：读取 GBK 编码的 `ShortCutList.txt`（日志 `decoded as ANSI/GBK`）、
       修复尾部 CRLF 导致空行累积的缺陷
 - [x] Release 便携打包：`scripts/package.ps1`（自动找 CMake → 构建 → 暂存 exe/res/文档/样例 ini
@@ -133,6 +133,20 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 验收：`Lang=EN` / `Lang=简体中文` 两种 ini 下启动，日志分别为 `using built-in en/zh strings`；
 首次生成的 `ShortCutList.txt` 显示名随语言变化（中文旧名 GBK / 英文新名）。
 证据：`07-evidence/localization/`。
+
+## M8 — 三种内置语言（✅）
+
+- [x] `[GUI] Lang` 收敛为 `zh_cn` / `zh_hk` / `en_us`；旧 `EN` / `简体中文` /
+      `繁体中文` 自动迁移，未知值回退 `en_us`
+- [x] 删除任意 `<Lang>.lang` 与 `About.<Lang>` 外置文件加载，关于正文也改为内置
+- [x] 原版 `繁体中文.lang` 一并生成进 224 键表；残留简体字运行时统一转繁
+- [x] 71 个 `res*` 键用 `LCMAP_TRADITIONAL_CHINESE` + 桌面术语替换补齐繁体
+- [x] 测试：295 键 × 3 语言，断言数 720 → **1024**；隐藏冒烟覆盖三种语言，
+      并验证恶意/遗留 `zh_cn.lang` 不会覆盖内置文案
+
+验收：三种语言日志分别为 `using built-in zh_cn/zh_hk/en_us strings`；
+默认列表名依次为 `我的电脑` / `我的電腦` / `My Computer`，GBK 落盘无丢字。
+证据：`07-evidence/three-locales/`。
 
 ## 后续可选增强（⏳）
 

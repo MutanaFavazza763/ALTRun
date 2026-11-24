@@ -11,7 +11,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$Version = '2.0.0',
+    [string]$Version = '2.0.3',
     [ValidateSet('Release', 'Debug')]
     [string]$Configuration = 'Release',
     [switch]$SkipBuild,
@@ -107,7 +107,7 @@ Alpha=240
 RoundBorderRadius=12
 ListFormat=%-25s| %s
 BGFileName=BG.jpg
-Lang=EN
+Lang=en_us
 TitleFont=Segoe UI|[]|12|65535|0
 KeywordFont=Segoe UI|[]|16|16777215|0
 ListFont=Segoe UI|[]|14|16777215|0

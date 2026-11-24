@@ -538,7 +538,9 @@ void ConfigWindow::CreateAppearancePage() {
                &Settings::round_border_radius, 0, 200, kPageLeft,
                kPageTop + 80, 120, 80);
     AddTextEdit(kPageAppearance, Loc("ConfigForm.LblLanguage"), &Settings::lang,
-                kPageLeft, kPageTop + 116, 120, 80);
+                kPageLeft, kPageTop + 116, 120, 120);
+    AddLabel(kPageAppearance, L"zh_cn / zh_hk / en_us", kPageLeft + 360,
+             kPageTop + 64, 300);
     AddTextEdit(kPageAppearance, Loc("ConfigForm.LblBackGroundImage"),
                 &Settings::bg_file_name, kPageLeft, kPageTop + 152, 120, 220);
 

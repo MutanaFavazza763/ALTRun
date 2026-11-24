@@ -38,28 +38,6 @@ constexpr int kButtonY = 316;
 
 constexpr int kIdClose = IDOK;
 
-std::wstring NormalizeNewlines(std::wstring text) {
-    std::wstring normalized;
-    normalized.reserve(text.size() + text.size() / 8);
-    for (size_t index = 0; index < text.size(); ++index) {
-        const wchar_t character = text[index];
-        if (character == L'\r') {
-            normalized.push_back(L'\r');
-            if (index + 1 < text.size() && text[index + 1] == L'\n') {
-                normalized.push_back(L'\n');
-                ++index;
-            } else {
-                normalized.push_back(L'\n');
-            }
-        } else if (character == L'\n') {
-            normalized += L"\r\n";
-        } else {
-            normalized.push_back(character);
-        }
-    }
-    return normalized;
-}
-
 }  // namespace
 
 AboutWindow::AboutWindow(Settings& settings) : settings_(settings) {}
@@ -171,7 +149,7 @@ void AboutWindow::CreateControls() {
                                  0);
 
     // Read-only multiline EDIT: scrolls, can take focus and lets the user
-    // select the URLs in About.<Lang> (a STATIC cannot).
+    // select the URLs in the built-in about text (a STATIC cannot).
     content_edit_ = MakeControl(
         WC_EDITW, L"",
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | ES_LEFT | ES_MULTILINE |
@@ -196,38 +174,15 @@ void AboutWindow::CreateControls() {
     }
 }
 
-std::wstring AboutWindow::AboutFilePath() const {
-    std::string lang = settings_.lang.empty() ? std::string("EN") : settings_.lang;
-    return ShellIntegration::ExecutableDirectory() + L"About." + ToWide(lang);
-}
-
 void AboutWindow::LoadAboutText() {
     if (content_edit_ == nullptr || content_label_ == nullptr) {
         return;
     }
-    const std::wstring path = AboutFilePath();
-    std::string content;
-    const bool found = Localization::ReadTextFileUtf8(path, &content);
-    std::wstring text;
-    if (found) {
-        text = NormalizeNewlines(ToWide(content));
-        Logger::Instance().Trace("about: loaded " + ToUtf8(path));
-    } else {
-        text = Localization::Instance().Get("resAboutFallback");
-        Logger::Instance().Trace("about: " + ToUtf8(path) +
-                                 " not found, using built-in text");
-    }
-    ::SetWindowTextW(content_edit_, text.c_str());
-
-    // Only the file name is shown: the full exe directory is already in the
-    // "Data directory" line and a long path would ellipsize the state suffix.
-    std::string lang = settings_.lang.empty() ? std::string("EN") : settings_.lang;
-    std::wstring label = Localization::Instance().Get("resAboutContent") +
-                         L"About." + ToWide(lang);
-    if (!found) {
-        label += Localization::Instance().Get("resAboutContentMissing");
-    }
-    ::SetWindowTextW(content_label_, label.c_str());
+    // About text is built in for all three locales; no About.<Lang> side file.
+    ::SetWindowTextW(content_edit_,
+                     Localization::Instance().Get("resAboutFallback").c_str());
+    ::SetWindowTextW(content_label_,
+                     Localization::Instance().Get("resAboutContent").c_str());
 }
 
 void AboutWindow::RefreshTexts() {

@@ -11,8 +11,8 @@
 //   * ShortcutStore  legacy ShortCutList.txt line parsing/serialisation
 //   * ParamHistory   rank bump + smallest-rank eviction
 //   * ShortcutSource path/URL derivation and relative path conversion
-//   * Localization   every legacy/res* key resolves in EN and 简体中文 without
-//                    a .lang file (built-in 224-key table + res* table)
+//   * Localization   every legacy/res* key resolves in en_us, zh_cn and zh_hk
+//                    (224-key built-in table + res* table, no external files)
 
 #include <windows.h>
 #include <objbase.h>
@@ -415,49 +415,53 @@ void TestFontSpec() {
 }
 
 // ---------------------------------------------------------------------------
-// Localization (built-in table fallback; external files are covered by the
-// dedicated smoke tests documented in docs/ROADMAP.md)
+// Localization (three built-in locales; no external .lang/About.<Lang> files)
 // ---------------------------------------------------------------------------
 void TestLocalization() {
     alt::Localization& loc = alt::Localization::Instance();
-    loc.Load("EN");  // no .lang next to the test exe -> built-in table
+    loc.Load("en_us");
     CHECK(!loc.Get("resTitle").empty());
     CHECK(!loc.Get("resHintInput").empty());
     // Unknown keys fall back to the key itself.
     CHECK(loc.Get("no.such.key") == L"no.such.key");
     CHECK(loc.Text("resNoMatch") == loc.Get("resNoMatch"));
 
-    // Every key the UI can request must resolve in both languages, with no
-    // <Lang>.lang file present.  The list is generated from the built-in
-    // tables by 08-tools/generate_test_loc_keys.py.
-    loc.Load("EN");
-    CHECK(loc.lang() == "EN");
-    for (const char* key : kLocalizationKeys) {
-        const std::wstring value = loc.Get(key);
-        ++g_checks;
-        // An empty value is legitimate (ConfigForm.VoidHotKey means "no
-        // hotkey"); only a fall-through to the key itself is a failure.
-        if (alt::ToUtf8(value) == key) {
-            Fail(key, __FILE__, __LINE__, "EN lookup fell through to the key");
-        }
-    }
+    // Canonical values and migration from legacy ini spellings.
+    CHECK(alt::Localization::NormalizeLanguage("en_us") == "en_us");
+    CHECK(alt::Localization::NormalizeLanguage("EN") == "en_us");
+    CHECK(alt::Localization::NormalizeLanguage("zh_cn") == "zh_cn");
+    CHECK(alt::Localization::NormalizeLanguage("简体中文") == "zh_cn");
+    CHECK(alt::Localization::NormalizeLanguage("zh-HK") == "zh_hk");
+    CHECK(alt::Localization::NormalizeLanguage("繁體中文") == "zh_hk");
+    CHECK(alt::Localization::NormalizeLanguage("de_DE") == "en_us");
 
-    loc.Load("简体中文");
-    CHECK(loc.lang() == "简体中文");
-    for (const char* key : kLocalizationKeys) {
-        const std::wstring value = loc.Get(key);
-        ++g_checks;
-        if (alt::ToUtf8(value) == key) {
-            Fail(key, __FILE__, __LINE__, "zh lookup fell through to the key");
+    // Every UI key must resolve in all three built-in locales.  The list is
+    // generated from the built-in tables by 08-tools/generate_test_loc_keys.py.
+    const char* const kLanguages[] = {"en_us", "zh_cn", "zh_hk"};
+    for (const char* language : kLanguages) {
+        loc.Load(language);
+        CHECK(loc.lang() == language);
+        for (const char* key : kLocalizationKeys) {
+            const std::wstring value = loc.Get(key);
+            ++g_checks;
+            // An empty value is legitimate (ConfigForm.VoidHotKey means "no
+            // hotkey"); only a fall-through to the key itself is a failure.
+            if (alt::ToUtf8(value) == key) {
+                Fail(key, __FILE__, __LINE__, "built-in lookup fell through");
+            }
         }
     }
 
     // The reload used by ApplySettings() must not lose the built-in table.
-    loc.Load("EN");
+    loc.Load("en_us");
     CHECK(loc.Get("ConfigForm.ConfigList_0") == L"Auto run me when Windows start");
-    loc.Load("简体中文");
+    loc.Load("zh_cn");
     CHECK(loc.Get("ConfigForm.ConfigList_0") == L"随系统自动启动");
-    loc.Load("EN");
+    loc.Load("zh_hk");
+    CHECK(loc.Get("ConfigForm.ConfigList_0") == L"隨系統自動啟動");
+    CHECK(loc.Get("resSaveListFailed").find(L"儲存") != std::wstring::npos);
+    CHECK(loc.Get("resImportReadFailed").find(L"檔案") != std::wstring::npos);
+    loc.Load("en_us");
 }
 
 }  // namespace
