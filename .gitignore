@@ -1,0 +1,39 @@
+# Build output
+/build/
+/out/
+CMakeCache.txt
+CMakeFiles/
+*.sln
+*.vcxproj*
+.vs/
+
+# Toolchain noise
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.exe
+*.dll
+*.log
+
+# Original Delphi artifacts (kept in git history only)
+*.dcu
+*.local
+*.identcache
+__history/
+
+# Runtime data generated next to the executable (portable layout)
+/ALTRun.ini
+/ShortCutList.txt
+/ShortCutList.txt.bak
+/ShortCutList.txt.tmp
+/FavoriteList.txt
+/ParamHistory.txt
+/altRun.log
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.user
+*.swp
