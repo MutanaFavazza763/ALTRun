@@ -79,18 +79,19 @@ private:
     void CreateHotkeyPage();
     void CreateAppearancePage();
     void CreateAboutPage();
-    HWND MakeControl(int page, const wchar_t* class_name, const wchar_t* text,
-                     DWORD style, int x, int y, int width, int height, int id);
-    HWND AddLabel(int page, const wchar_t* text, int x, int y, int width,
+    HWND MakeControl(int page, const wchar_t* class_name,
+                     const std::wstring& text, DWORD style, int x, int y,
+                     int width, int height, int id);
+    HWND AddLabel(int page, const std::wstring& text, int x, int y, int width,
                   int height = 24, DWORD extra_style = SS_LEFT);
-    HWND AddCheckBox(int page, const wchar_t* text, int x, int y, int width);
-    HWND AddIntEdit(int page, const wchar_t* label, int Settings::*field,
+    HWND AddCheckBox(int page, const std::wstring& text, int x, int y, int width);
+    HWND AddIntEdit(int page, const std::wstring& label, int Settings::*field,
                     int min_value, int max_value, int x, int y, int label_width,
                     int edit_width);
-    HWND AddTextEdit(int page, const wchar_t* label,
+    HWND AddTextEdit(int page, const std::wstring& label,
                      std::string Settings::*field, int x, int y, int label_width,
                      int edit_width);
-    HWND AddHotkeyEdit(int page, const wchar_t* label,
+    HWND AddHotkeyEdit(int page, const std::wstring& label,
                        std::string Settings::*field, int x, int y, int label_width,
                        int edit_width);
     void ApplyFont(HWND control) const;

@@ -92,7 +92,8 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 - [x] 字体串解析（`TitleFont/KeywordFont/ListFont`：`字体名|样式集|磅值|TColor|字符集`，
       容错解析、五段序列化、`fsBold` → 粗体）
 - [x] 多语言框架（`Localization`：`<Lang>.lang` UTF-8/BOM/GBK/UTF-16，INI 风格；
-      文件 → 内置 EN/中文 → 键名 三级回退；主窗口文案与关于窗动态字段已接入）
+      文件 → `res*` 重写表 → 原版 224 键内置表 → 裸键后缀回退 → 键名；主窗口/关于/设置/
+      管理器/编辑/参数窗/托盘/默认列表全部接入，见 M7）
 - [x] 提示音 `Popup.wav`（`PlayPopupNotify`，`PlaySoundW` 异步，缺失静默）
 - [x] `AddToSendTo`（`%APPDATA%\Microsoft\Windows\SendTo\ALTRun.lnk`，设置里改完立即生效）
 - [x] 关于窗口（版本、原版仓库链接、`ShortCutRunCount`、ini/数据目录、`About.<Lang>` 正文；
@@ -104,11 +105,11 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 
 ## M6 — 质量与发布（✅）
 
-- [x] `altRunTests` 单元测试目标（116 项断言，CTest 集成，`-DALTRUN_BUILD_TESTS=OFF` 可关）：
+- [x] `altRunTests` 单元测试目标（**720 项断言**，CTest 集成，`-DALTRUN_BUILD_TESTS=OFF` 可关）：
       Encoding（GBK 中文往返）、Formatter（ListFormat/前缀/CJK 宽度）、Matcher（通配符转换、
       打分公式、`Sort()` 排序键、大小写、空行跳过）、ShortcutStore（新旧格式解析/序列化往返、
       含 `|` 的命令行）、ParamHistory（rank 递增与最小 rank 淘汰）、ShortcutSource（路径/URL
-      关键字推导、目录名不截断、缺失 .lnk）、FontSpec、Localization 回退
+      关键字推导、目录名不截断、缺失 .lnk）、FontSpec、Localization（296 键 × 中英文全覆盖）
 - [x] 编码兼容验证：读取 GBK 编码的 `ShortCutList.txt`（日志 `decoded as ANSI/GBK`）、
       修复尾部 CRLF 导致空行累积的缺陷
 - [x] Release 便携打包：`scripts/package.ps1`（自动找 CMake → 构建 → 暂存 exe/res/文档/样例 ini
@@ -118,9 +119,24 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 
 验收：`ctest -C Release` 全绿；`scripts/package.ps1` 产出 zip；解压后直接运行 exe 正常。
 
+## M7 — 本地化收尾（✅）
+
+- [x] 原版 `EN.lang` / `简体中文.lang` 各 224 键（8 section，键集一致）解析并生成
+      `src/core/LocalizationBuiltin.inc`，无 `.lang` 文件也能整段切换中英文
+- [x] `Localization::Get()` 四级查找（文件 → `res*` → 224 键表 → 裸键后缀），大小写不敏感
+- [x] `ui/UiText.h`（`Loc`/`LocArg`/`LocArgInt`）统一入口；`MainWindow` 的本地 `Loc` 删除
+- [x] 5 个窗口 + 托盘菜单/tooltip + `ShortcutStore` 默认列表名接入；`src` 下无中文硬编码
+- [x] 72 个 `res*` 键补齐重写独有文案（导入导出、参数窗、调试页、热键捕获提示等）
+- [x] 测试：296 键 × 2 语言逐个断言不回退（`tests/LocalizationKeys.inc`，由
+      `08-tools/generate_test_loc_keys.py` 生成），断言数 124 → 720
+
+验收：`Lang=EN` / `Lang=简体中文` 两种 ini 下启动，日志分别为 `using built-in en/zh strings`；
+首次生成的 `ShortCutList.txt` 显示名随语言变化（中文旧名 GBK / 英文新名）。
+证据：`07-evidence/localization/`。
+
 ## 后续可选增强（⏳）
 
-- [ ] 设置/管理器/编辑/参数窗接入本地化（补全 224 键内置表）
+- [ ] `frmLang` 语言下拉框（现在要手改 `[GUI] Lang`）
 - [ ] 管理器窗口尺寸/列宽记忆（原版 `ManWin*`/`ManColWidth*`）
 - [ ] 单实例唤醒时复用已运行实例（`HandleID` 消息）
 - [ ] GitHub Actions CI 与代码签名

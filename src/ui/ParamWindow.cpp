@@ -8,6 +8,7 @@
 
 #include "core/Logger.h"
 #include "core/Text.h"
+#include "ui/UiText.h"
 
 namespace alt {
 namespace {
@@ -44,7 +45,7 @@ ParamWindow::~ParamWindow() {
 }
 
 bool ParamWindow::CreateParamWindow(HINSTANCE instance) {
-    return Create(instance, L"ALTRun.ParamWindow.v2", L"ALTRun 参数",
+    return Create(instance, L"ALTRun.ParamWindow.v2", Loc("resParamTitle"),
                   WS_POPUP, WS_EX_TOPMOST | WS_EX_TOOLWINDOW);
 }
 
@@ -78,7 +79,7 @@ void ParamWindow::Open(const Shortcut& item, ConfirmHandler on_confirm) {
     if (hwnd_ == nullptr) {
         return;
     }
-    item_label_ = ToWide(item.DisplayName() + "   输入参数");
+    item_label_ = ToWide(item.DisplayName()) + Loc("resParamPrompt");
     on_confirm_ = std::move(on_confirm);
 
     shown_.clear();
@@ -280,14 +281,14 @@ void ParamWindow::DrawFrame() {
     d2d_.FillRoundedRect(ok, 4.0f, kSelected);
     IDWriteTextFormat* centered = hint_format_.Get();
     centered->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-    d2d_.DrawTextBlock(L"确定", centered, ok, kTextBright);
+    d2d_.DrawTextBlock(Loc("Common.BtnOK"), centered, ok, kTextBright);
     centered->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 
     DrawHistory();
 
     const float footer_top = kPad + kTitleHeight + kEditHeight + 6.0f +
                              VisibleHistoryRows() * kRowHeight;
-    d2d_.DrawTextBlock(L"Enter 确定    Esc 清空/取消    空闲自动关闭", hint_format_.Get(),
+    d2d_.DrawTextBlock(Loc("resParamHint"), hint_format_.Get(),
                        D2D1::RectF(kPad, footer_top, width - kPad,
                                    footer_top + kFooterHeight),
                        kTextDim);

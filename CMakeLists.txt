@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(ALTRun
-    VERSION 2.0.0
+    VERSION 2.0.2
     DESCRIPTION "ALTRun - an alternative Run. Fast launcher for Windows."
     LANGUAGES CXX)
 
@@ -54,6 +54,7 @@ set(ALTRUN_HEADERS
     src/core/Formatter.h
     src/core/Launcher.h
     src/core/Localization.h
+    src/core/LocalizationBuiltin.inc
     src/core/Logger.h
     src/core/Matcher.h
     src/core/ParamHistory.h
@@ -69,6 +70,7 @@ set(ALTRUN_HEADERS
     src/ui/ShortcutEditWindow.h
     src/ui/ShortcutManagerWindow.h
     src/ui/SkinImage.h
+    src/ui/UiText.h
     src/ui/Window.h
 )
 

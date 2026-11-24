@@ -42,7 +42,8 @@ private:
     void CreateFonts();
     void DestroyResources();
     void CreateControls();
-    HWND MakeControl(const wchar_t* class_name, const wchar_t* text, DWORD style,
+    HWND MakeControl(const wchar_t* class_name, const std::wstring& text,
+                     DWORD style,
                      int x, int y, int width, int height, int id);
     void ApplyFont(HWND control) const;
 

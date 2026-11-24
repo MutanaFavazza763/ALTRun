@@ -14,12 +14,12 @@
 #include "core/Logger.h"
 #include "core/ShortcutSource.h"
 #include "core/Text.h"
+#include "ui/UiText.h"
 
 namespace alt {
 namespace {
 
 constexpr wchar_t kWindowClass[] = L"ALTRun.ShortcutEditWindow.v2";
-constexpr wchar_t kWindowTitle[] = L"快捷项";
 
 // Layout in 96-DPI design units (scaled with ShortcutEditWindow::S()).
 constexpr int kWindowWidth = 560;
@@ -146,7 +146,9 @@ bool ShortcutEditWindow::CreateEditWindow(HINSTANCE instance) {
     // WS_CLIPCHILDREN keeps the native controls from being painted over by the
     // parent background; WS_EX_TOPMOST/WS_EX_TOOLWINDOW match the other ALTRun
     // windows (no taskbar entry).
-    if (!Create(instance, kWindowClass, kWindowTitle, WS_POPUP | WS_CLIPCHILDREN,
+    if (!Create(instance, kWindowClass,
+                Loc("ShortCutForm.ShortCutFormCaption"),
+                WS_POPUP | WS_CLIPCHILDREN,
                 WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) {
         return false;
     }
@@ -207,11 +209,12 @@ void ShortcutEditWindow::ApplyFont(HWND control) const {
 }
 
 HWND ShortcutEditWindow::MakeControl(const wchar_t* class_name,
-                                     const wchar_t* text, DWORD style, int x,
+                                     const std::wstring& text, DWORD style, int x,
                                      int y, int width, int height, int id) {
     HWND control = ::CreateWindowExW(
-        0, class_name, text, style, S(x), S(y), S(width), S(height), hwnd_,
-        reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance_, nullptr);
+        0, class_name, text.c_str(), style, S(x), S(y), S(width), S(height),
+        hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance_,
+        nullptr);
     if (control == nullptr) {
         Logger::Instance().Warn(std::string("shortcut edit window: cannot create ") +
                                 ToUtf8(class_name));
@@ -222,70 +225,70 @@ HWND ShortcutEditWindow::MakeControl(const wchar_t* class_name,
 }
 
 void ShortcutEditWindow::CreateControls() {
-    MakeControl(WC_STATICW, L"关键字：", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+    MakeControl(WC_STATICW, Loc("resLabelKeyword"), WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
                 kMargin, 58, kLabelWidth, kRowHeight, 0);
     keyword_edit_ = MakeControl(WC_EDITW, L"",
                                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_LEFT |
                                     ES_AUTOHSCROLL,
                                 kFieldX, 58, kFieldWidth, kRowHeight, kIdKeyword);
 
-    MakeControl(WC_STATICW, L"显示名：", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+    MakeControl(WC_STATICW, Loc("resLabelName"), WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
                 kMargin, 90, kLabelWidth, kRowHeight, 0);
     name_edit_ = MakeControl(WC_EDITW, L"",
                              WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_LEFT |
                                  ES_AUTOHSCROLL,
                              kFieldX, 90, kFieldWidth, kRowHeight, kIdName);
 
-    MakeControl(WC_STATICW, L"命令行：", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+    MakeControl(WC_STATICW, Loc("resLabelCommandLine"), WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
                 kMargin, 122, kLabelWidth, kRowHeight, 0);
     command_line_edit_ =
         MakeControl(WC_EDITW, L"",
                     WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_LEFT | ES_AUTOHSCROLL,
                     kFieldX, 122, kFieldWidth, kRowHeight, kIdCommandLine);
 
-    MakeControl(WC_STATICW, L"参数模式：", WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
+    MakeControl(WC_STATICW, Loc("resLabelParamType"), WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
                 kMargin, 158, kLabelWidth, kRowHeight, 0);
     // The first radio carries WS_GROUP so arrow keys move inside the group and
     // Tab leaves it again.
-    radio_none_ = MakeControl(WC_BUTTONW, L"无参数",
+    radio_none_ = MakeControl(WC_BUTTONW, Loc("resParamNone"),
                               WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_GROUP |
                                   BS_AUTORADIOBUTTON,
                               kFieldX, 158, 100, kRowHeight, kIdParamNone);
     radio_no_encoding_ = MakeControl(
-        WC_BUTTONW, L"参数无编码",
+        WC_BUTTONW, Loc("resParamNoEncoding"),
         WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON, kFieldX + 118, 158, 140,
         kRowHeight, kIdParamNoEncoding);
-    radio_url_query_ = MakeControl(WC_BUTTONW, L"URL 编码",
+    radio_url_query_ = MakeControl(WC_BUTTONW, Loc("resParamUrlQuery"),
                                    WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
                                    kFieldX, 186, 100, kRowHeight, kIdParamUrlQuery);
     radio_utf8_query_ = MakeControl(
-        WC_BUTTONW, L"UTF-8 编码",
+        WC_BUTTONW, Loc("resParamUtf8Query"),
         WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON, kFieldX + 118, 186, 140,
         kRowHeight, kIdParamUtf8Query);
 
     pick_file_button_ = MakeControl(
-        WC_BUTTONW, L"选择文件…",
+        WC_BUTTONW, Loc("resPickFile"),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, kFieldX, 222, 120,
         kButtonHeight, kIdPickFile);
     pick_folder_button_ = MakeControl(
-        WC_BUTTONW, L"选择目录…",
+        WC_BUTTONW, Loc("resPickFolder"),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, kFieldX + 130, 222,
         120, kButtonHeight, kIdPickFolder);
-    test_button_ = MakeControl(WC_BUTTONW, L"测试",
+    test_button_ = MakeControl(WC_BUTTONW, Loc("Common.BtnTest"),
                                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                                kFieldX + 260, 222, 84, kButtonHeight, kIdTest);
 
     hint_label_ = MakeControl(
-        WC_STATICW,
-        L"选择文件/目录会自动填入命令行；关键字为空时按路径规则推导关键字与显示名。",
+        WC_STATICW, Loc("resEditHint"),
         WS_CHILD | WS_VISIBLE | SS_LEFT, kFieldX, 262, kFieldWidth, 36, 0);
 
-    ok_button_ = MakeControl(WC_BUTTONW, L"确定",
+    ok_button_ = MakeControl(WC_BUTTONW, Loc("Common.BtnOK"),
                              WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
                              kWindowWidth - kMargin - 2 * 84 - 8, 306, 84,
                              kButtonHeight, IDOK);
     cancel_button_ = MakeControl(
-        WC_BUTTONW, L"取消", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+        WC_BUTTONW, Loc("Common.BtnCancel"),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
         kWindowWidth - kMargin - 84, 306, 84, kButtonHeight, IDCANCEL);
 
     HWND subclassed[] = {keyword_edit_,      name_edit_,       command_line_edit_,
@@ -359,7 +362,10 @@ void ShortcutEditWindow::Open(const Shortcut* item, ConfirmHandler on_confirm) {
     editing_new_ = item == nullptr;
     original_ = item != nullptr ? *item : Shortcut{};
     LoadFromShortcut(original_, editing_new_);
-    ::SetWindowTextW(hwnd_, editing_new_ ? L"新增快捷项" : L"编辑快捷项");
+    // The legacy caption was just "快捷项"; the rewrite tells add and edit apart.
+    const std::wstring title =
+        Loc(editing_new_ ? "resTitleAddShortcut" : "resTitleEditShortcut");
+    ::SetWindowTextW(hwnd_, title.c_str());
 
     owner_ = ::GetActiveWindow();
     if (owner_ == hwnd_) {
@@ -422,24 +428,24 @@ void ShortcutEditWindow::Confirm() {
         return;
     }
     if (keyword.empty()) {
-        ::MessageBoxW(hwnd_,
-                      L"关键字不能为空。\r\n\r\n如确实要保留一个空白分隔行，请把命令行也清空。",
-                      L"快捷项", MB_OK | MB_ICONWARNING);
+        ::MessageBoxW(hwnd_, Loc("resKeywordEmpty").c_str(),
+                      Loc("ShortCutForm.ShortCutFormCaption").c_str(),
+                      MB_OK | MB_ICONWARNING);
         ::SetFocus(keyword_edit_);
         return;
     }
     if (keyword.find('|') != std::string::npos) {
-        MessageBoxW(hwnd_,
-                    L"关键字不能包含半角竖线（|），否则会破坏 ShortCutList.txt 格式。",
-                    L"快捷项", MB_OK | MB_ICONWARNING);
+        MessageBoxW(hwnd_, Loc("resKeywordPipe").c_str(),
+                    Loc("ShortCutForm.ShortCutFormCaption").c_str(),
+                    MB_OK | MB_ICONWARNING);
         ::SetFocus(keyword_edit_);
         return;
     }
     if (name.find(',') != std::string::npos ||
         name.find('|') != std::string::npos) {
-        MessageBoxW(hwnd_,
-                    L"显示名不能包含半角逗号（,）或竖线（|），否则会破坏存档格式。",
-                    L"快捷项", MB_OK | MB_ICONWARNING);
+        MessageBoxW(hwnd_, Loc("resNameSeparator").c_str(),
+                    Loc("ShortCutForm.ShortCutFormCaption").c_str(),
+                    MB_OK | MB_ICONWARNING);
         ::SetFocus(name_edit_);
         return;
     }
@@ -476,35 +482,38 @@ void ShortcutEditWindow::Cancel() {
 void ShortcutEditWindow::TestCommandLine() {
     const Shortcut item = CurrentShortcut();
     if (item.command_line.empty()) {
-        MessageBoxW(hwnd_, L"请先填写命令行。", L"测试", MB_OK | MB_ICONWARNING);
+        MessageBoxW(hwnd_, Loc("resNeedCommandLine").c_str(),
+                    Loc("Common.BtnTest").c_str(), MB_OK | MB_ICONWARNING);
         return;
     }
     const LaunchResult result = LaunchShortcut(item, "");
     if (result.ok) {
         return;
     }
-    std::wstring text = L"无法执行该命令行：\r\n";
+    std::wstring text = Loc("resTestFailed");
     text += ToWide(item.command_line);
     if (!result.message.empty()) {
         text += L"\r\n";
         text += ToWide(result.message);
     }
     if (result.error != 0) {
-        text += L"\r\n错误码：";
+        text += Loc("resTestErrorCode");
         text += std::to_wstring(result.error);
     }
-    MessageBoxW(hwnd_, text.c_str(), L"测试", MB_OK | MB_ICONWARNING);
+    MessageBoxW(hwnd_, text.c_str(), Loc("Common.BtnTest").c_str(),
+                MB_OK | MB_ICONWARNING);
 }
 
 void ShortcutEditWindow::PickFile() {
-    const std::wstring path = PickFileNative(hwnd_, L"选择文件");
+    const std::wstring path = PickFileNative(hwnd_, Loc("resPickFileTitle").c_str());
     if (!path.empty()) {
         ApplyPickedPath(path);
     }
 }
 
 void ShortcutEditWindow::PickFolder() {
-    const std::wstring path = PickFolderNative(hwnd_, L"选择目录");
+    const std::wstring path =
+        PickFolderNative(hwnd_, Loc("ShortCutForm.SelectDir").c_str());
     if (!path.empty()) {
         ApplyPickedPath(path);
     }

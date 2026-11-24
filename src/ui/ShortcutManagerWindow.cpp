@@ -16,12 +16,12 @@
 #include "core/Logger.h"
 #include "core/Text.h"
 #include "ui/ShortcutEditWindow.h"
+#include "ui/UiText.h"
 
 namespace alt {
 namespace {
 
 constexpr wchar_t kWindowClass[] = L"ALTRun.ShortcutManagerWindow.v2";
-constexpr wchar_t kWindowTitle[] = L"快捷项管理";
 
 // Layout in 96-DPI design units (scaled with ShortcutManagerWindow::S()).
 constexpr int kWindowWidth = 900;
@@ -51,8 +51,10 @@ constexpr int kIdImport = 2008;
 
 constexpr size_t kMaxImportFileSize = 32u * 1024u * 1024u;
 
-const wchar_t* const kColumnTitles[] = {L"关键字", L"显示名", L"参数类型",
-                                        L"命令行"};
+// Column headers reuse the legacy [Common] keys; "关键字" and "显示名" have no
+// legacy counterpart, so they keep rewrite keys.
+const char* const kColumnKeys[] = {"resKeyword", "Common.Name", "Common.ParamType",
+                                   "Common.CommandLine"};
 constexpr int kColumnWidths[] = {140, 140, 100, 480};
 
 std::wstring FilesystemPath(IShellItem* item) {
@@ -153,7 +155,9 @@ bool ShortcutManagerWindow::CreateManagerWindow(HINSTANCE instance) {
     controls.dwICC = ICC_LISTVIEW_CLASSES;
     ::InitCommonControlsEx(&controls);
 
-    if (!Create(instance, kWindowClass, kWindowTitle, WS_POPUP | WS_CLIPCHILDREN,
+    if (!Create(instance, kWindowClass,
+                Loc("ShortCutManForm.ShortCutManFormCaption"),
+                WS_POPUP | WS_CLIPCHILDREN,
                 WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) {
         return false;
     }
@@ -227,12 +231,13 @@ void ShortcutManagerWindow::ApplyFont(HWND control) const {
 }
 
 HWND ShortcutManagerWindow::MakeControl(const wchar_t* class_name,
-                                        const wchar_t* text, DWORD style,
+                                        const std::wstring& text, DWORD style,
                                         int x, int y, int width, int height,
                                         int id) {
     HWND control = ::CreateWindowExW(
-        0, class_name, text, style, S(x), S(y), S(width), S(height), hwnd_,
-        reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance_, nullptr);
+        0, class_name, text.c_str(), style, S(x), S(y), S(width), S(height),
+        hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance_,
+        nullptr);
     if (control == nullptr) {
         Logger::Instance().Warn(std::string("shortcut manager: cannot create ") +
                                 ToUtf8(class_name));
@@ -250,14 +255,15 @@ void ShortcutManagerWindow::CreateControls() {
     if (list_ != nullptr) {
         ListView_SetExtendedListViewStyle(
             list_, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_LABELTIP);
-        const int column_count = static_cast<int>(std::size(kColumnTitles));
+        const int column_count = static_cast<int>(std::size(kColumnKeys));
         for (int index = 0; index < column_count; ++index) {
+            const std::wstring title = Loc(kColumnKeys[index]);
             LVCOLUMNW column = {};
             column.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM | LVCF_FMT;
             column.fmt = LVCFMT_LEFT;
             column.cx = S(kColumnWidths[index]);
             column.iSubItem = index;
-            column.pszText = const_cast<LPWSTR>(kColumnTitles[index]);
+            column.pszText = const_cast<LPWSTR>(title.c_str());
             ListView_InsertColumn(list_, index, &column);
         }
         ::SetWindowSubclass(list_, &ShortcutManagerWindow::ListSubclassProc, 1,
@@ -272,28 +278,29 @@ void ShortcutManagerWindow::CreateControls() {
     const int edit_x = delete_x - kRowButtonGap - kRowButtonWidth;
     const int add_x = edit_x - kRowButtonGap - kRowButtonWidth;
 
-    add_button_ = MakeControl(WC_BUTTONW, L"新增",
+    add_button_ = MakeControl(WC_BUTTONW, Loc("Common.BtnAdd"),
                               WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                               add_x, kRowButtonY, kRowButtonWidth,
                               kRowButtonHeight, kIdAdd);
-    edit_button_ = MakeControl(WC_BUTTONW, L"编辑",
+    edit_button_ = MakeControl(WC_BUTTONW, Loc("Common.BtnEdit"),
                                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                                edit_x, kRowButtonY, kRowButtonWidth,
                                kRowButtonHeight, kIdEdit);
     delete_button_ = MakeControl(
-        WC_BUTTONW, L"删除",
+        WC_BUTTONW, Loc("Common.BtnDelete"),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, delete_x,
         kRowButtonY, kRowButtonWidth, kRowButtonHeight, kIdDelete);
-    up_button_ = MakeControl(WC_BUTTONW, L"上移",
+    up_button_ = MakeControl(WC_BUTTONW, Loc("resMoveUp"),
                              WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                              up_x, kRowButtonY, kRowButtonWidth, kRowButtonHeight,
                              kIdUp);
     down_button_ = MakeControl(
-        WC_BUTTONW, L"下移",
+        WC_BUTTONW, Loc("resMoveDown"),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, down_x, kRowButtonY,
         kRowButtonWidth, kRowButtonHeight, kIdDown);
     ok_button_ = MakeControl(
-        WC_BUTTONW, L"确定", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
+        WC_BUTTONW, Loc("Common.BtnOK"),
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
         ok_x, kRowButtonY, kRowButtonWidth, kRowButtonHeight, kIdOk);
 
     // 导入/导出 live in the bottom-right corner; the item actions share the row
@@ -302,16 +309,16 @@ void ShortcutManagerWindow::CreateControls() {
     const int import_x = small_row_right;
     const int export_x = import_x - kRowButtonGap - kSmallButtonWidth;
     export_button_ = MakeControl(
-        WC_BUTTONW, L"导出…",
+        WC_BUTTONW, Loc("resExport"),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, export_x,
         kSmallButtonY, kSmallButtonWidth, kSmallButtonHeight, kIdExport);
     import_button_ = MakeControl(
-        WC_BUTTONW, L"导入…", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+        WC_BUTTONW, Loc("resImport"), WS_CHILD | WS_VISIBLE | WS_TABSTOP |
+                                          BS_PUSHBUTTON,
         import_x, kSmallButtonY, kSmallButtonWidth, kSmallButtonHeight, kIdImport);
 
     hint_label_ = MakeControl(
-        WC_STATICW,
-        L"提示：拖动行可调整顺序；双击行编辑，Delete 删除，Insert 新增，F2 编辑。",
+        WC_STATICW, Loc("resManagerHint"),
         WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE, kListX, kSmallButtonY,
         560, kSmallButtonHeight, 0);
 
@@ -340,13 +347,13 @@ void ShortcutManagerWindow::OnCreate() {
 std::wstring ShortcutManagerWindow::ParamTypeLabel(ParamType type) {
     switch (type) {
         case ParamType::None:
-            return L"无参数";
+            return Loc("ShortCutForm.ParamType_0");
         case ParamType::NoEncoding:
-            return L"参数无编码";
+            return Loc("ShortCutForm.ParamType_1");
         case ParamType::UrlQuery:
-            return L"URL 编码";
+            return Loc("ShortCutForm.ParamType_2");
         case ParamType::Utf8Query:
-            return L"UTF-8 编码";
+            return Loc("ShortCutForm.ParamType_3");
     }
     return {};
 }
@@ -364,7 +371,7 @@ void ShortcutManagerWindow::ReloadList(int select_row) {
         const std::wstring keyword =
             entry.is_blank ? std::wstring(L"—") : ToWide(entry.item.keyword);
         const std::wstring name =
-            entry.is_blank ? std::wstring(L"（空白分隔行）") : ToWide(entry.item.name);
+            entry.is_blank ? Loc("resBlankRow") : ToWide(entry.item.name);
         const std::wstring param_type =
             entry.is_blank ? std::wstring() : ParamTypeLabel(entry.item.param_type);
         const std::wstring command_line =
@@ -457,9 +464,9 @@ bool ShortcutManagerWindow::IsDuplicate(const Shortcut& item, int ignore_index) 
 void ShortcutManagerWindow::SaveAndNotify() {
     if (!store_.Save()) {
         Logger::Instance().Error("shortcut manager: saving shortcut list failed");
-        MessageBoxW(hwnd_,
-                    L"保存 ShortCutList.txt 失败，请检查程序目录的写入权限。",
-                    L"快捷项管理", MB_OK | MB_ICONERROR);
+        MessageBoxW(hwnd_, Loc("resSaveListFailed").c_str(),
+                    Loc("ShortCutManForm.ShortCutManFormCaption").c_str(),
+                    MB_OK | MB_ICONERROR);
     }
     if (changed_handler_) {
         changed_handler_();
@@ -472,7 +479,8 @@ void ShortcutManagerWindow::AddItem() {
     }
     edit_window_->Open(nullptr, [this](const Shortcut& item, bool is_blank) {
         if (!is_blank && IsDuplicate(item, -1)) {
-            MessageBoxW(hwnd_, L"该快捷项已存在！", L"快捷项管理",
+            MessageBoxW(hwnd_, Loc("resShortcutExists").c_str(),
+                        Loc("ShortCutManForm.ShortCutManFormCaption").c_str(),
                         MB_OK | MB_ICONWARNING);
             return;
         }
@@ -510,7 +518,8 @@ void ShortcutManagerWindow::EditSelected() {
                                return;
                            }
                            if (!is_blank && IsDuplicate(item, index)) {
-                               MessageBoxW(hwnd_, L"该快捷项已存在！", L"快捷项管理",
+                               MessageBoxW(hwnd_, Loc("resShortcutExists").c_str(),
+                                           Loc("ShortCutManForm.ShortCutManFormCaption").c_str(),
                                            MB_OK | MB_ICONWARNING);
                                return;
                            }
@@ -537,11 +546,12 @@ void ShortcutManagerWindow::DeleteSelected() {
     const ShortcutEntry& entry = entries[static_cast<size_t>(index)];
     std::wstring question;
     if (entry.is_blank) {
-        question = L"确定要删除这个空白分隔行吗？";
+        question = Loc("ShortCutManForm.DeleteBlankLine");
     } else {
-        question = L"确定要删除快捷项「" + ToWide(entry.item.DisplayName()) + L"」吗？";
+        question = LocArg(Loc("resDeleteConfirm"),
+                          ToWide(entry.item.DisplayName()));
     }
-    if (MessageBoxW(hwnd_, question.c_str(), L"删除",
+    if (MessageBoxW(hwnd_, question.c_str(), Loc("resTitleDelete").c_str(),
                     MB_YESNO | MB_ICONQUESTION) != IDYES) {
         return;
     }
@@ -642,9 +652,9 @@ void ShortcutManagerWindow::ShowContextMenu(POINT screen_position) {
     if (menu == nullptr) {
         return;
     }
-    ::AppendMenuW(menu, MF_STRING, kIdAdd, L"新增(&A)");
-    ::AppendMenuW(menu, MF_STRING, kIdEdit, L"编辑(&E)");
-    ::AppendMenuW(menu, MF_STRING, kIdDelete, L"删除(&D)");
+    ::AppendMenuW(menu, MF_STRING, kIdAdd, Loc("resMenuAdd").c_str());
+    ::AppendMenuW(menu, MF_STRING, kIdEdit, Loc("resMenuEdit").c_str());
+    ::AppendMenuW(menu, MF_STRING, kIdDelete, Loc("resMenuDelete").c_str());
     if (SelectedRow() < 0) {
         ::EnableMenuItem(menu, kIdEdit, MF_BYCOMMAND | MF_GRAYED);
         ::EnableMenuItem(menu, kIdDelete, MF_BYCOMMAND | MF_GRAYED);
@@ -706,44 +716,46 @@ bool ShortcutManagerWindow::ReadFileBytes(const std::wstring& path,
 }
 
 void ShortcutManagerWindow::ExportToFile() {
-    const std::wstring target =
-        PickSaveFileNative(hwnd_, L"导出快捷项列表", L"ShortCutList.txt");
+    const std::wstring target = PickSaveFileNative(
+        hwnd_, Loc("resExportPickTitle").c_str(), L"ShortCutList.txt");
     if (target.empty()) {
         return;
     }
     const std::wstring source = store_.list_path();
     if (::CompareStringOrdinal(source.c_str(), -1, target.c_str(), -1, TRUE) ==
         CSTR_EQUAL) {
-        MessageBoxW(hwnd_, L"目标文件就是当前的 ShortCutList.txt，无需导出。",
-                    L"导出", MB_OK | MB_ICONINFORMATION);
+        MessageBoxW(hwnd_, Loc("resExportSameFile").c_str(),
+                    Loc("resTitleExport").c_str(), MB_OK | MB_ICONINFORMATION);
         return;
     }
     // Make sure the on-disk file matches the in-memory list before copying it.
     if (!store_.Save()) {
-        MessageBoxW(hwnd_, L"保存 ShortCutList.txt 失败，无法导出。", L"导出",
-                    MB_OK | MB_ICONERROR);
+        MessageBoxW(hwnd_, Loc("resExportSaveFailed").c_str(),
+                    Loc("resTitleExport").c_str(), MB_OK | MB_ICONERROR);
         return;
     }
     if (::CopyFileW(source.c_str(), target.c_str(), FALSE) == FALSE) {
         const std::wstring text =
-            L"导出失败，错误码：" + std::to_wstring(::GetLastError());
-        MessageBoxW(hwnd_, text.c_str(), L"导出", MB_OK | MB_ICONERROR);
+            Loc("resExportFailedCode") + std::to_wstring(::GetLastError());
+        MessageBoxW(hwnd_, text.c_str(), Loc("resTitleExport").c_str(),
+                    MB_OK | MB_ICONERROR);
         return;
     }
-    const std::wstring text = L"已导出到：\r\n" + target;
-    MessageBoxW(hwnd_, text.c_str(), L"导出", MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = Loc("resExportDone") + L"\r\n" + target;
+    MessageBoxW(hwnd_, text.c_str(), Loc("resTitleExport").c_str(),
+                MB_OK | MB_ICONINFORMATION);
 }
 
 void ShortcutManagerWindow::ImportFromFile() {
     const std::wstring path =
-        PickOpenFileNative(hwnd_, L"导入快捷项列表（将替换当前列表）");
+        PickOpenFileNative(hwnd_, Loc("resImportPickTitle").c_str());
     if (path.empty()) {
         return;
     }
     std::string bytes;
     if (!ReadFileBytes(path, &bytes)) {
-        MessageBoxW(hwnd_, L"无法读取所选文件（文件过大或读取失败）。", L"导入",
-                    MB_OK | MB_ICONERROR);
+        MessageBoxW(hwnd_, Loc("resImportReadFailed").c_str(),
+                    Loc("resTitleImport").c_str(), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -796,18 +808,19 @@ void ShortcutManagerWindow::ReplaceFromImportedText(const std::string& text) {
     }
 
     if (parsed.empty()) {
-        MessageBoxW(hwnd_, L"所选文件中没有可导入的快捷项。", L"导入",
-                    MB_OK | MB_ICONWARNING);
+        MessageBoxW(hwnd_, Loc("resImportNothing").c_str(),
+                    Loc("resTitleImport").c_str(), MB_OK | MB_ICONWARNING);
         return;
     }
 
     const std::wstring question =
-        L"导入将替换当前的快捷项列表。\r\n\r\n当前：" +
-        std::to_wstring(store_.entries().size()) + L" 行（快捷项 " +
-        std::to_wstring(CountItems(store_.entries())) + L" 条）\r\n导入：" +
-        std::to_wstring(parsed.size()) + L" 行（快捷项 " +
-        std::to_wstring(CountItems(parsed)) + L" 条）\r\n\r\n是否继续？";
-    if (MessageBoxW(hwnd_, question.c_str(), L"导入",
+        Loc("resImportConfirm") + L"\r\n\r\n" + Loc("resImportCurrent") +
+        std::to_wstring(store_.entries().size()) + Loc("resImportRows") +
+        std::to_wstring(CountItems(store_.entries())) + Loc("resImportItems") +
+        L"\r\n" + Loc("resImportIncoming") + std::to_wstring(parsed.size()) +
+        Loc("resImportRows") + std::to_wstring(CountItems(parsed)) +
+        Loc("resImportItems") + L"\r\n\r\n" + Loc("resImportContinue");
+    if (MessageBoxW(hwnd_, question.c_str(), Loc("resTitleImport").c_str(),
                     MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) != IDYES) {
         return;
     }
@@ -912,7 +925,8 @@ void ShortcutManagerWindow::DrawHeader(HDC dc) const {
     ::SetTextColor(dc, ::GetSysColor(COLOR_BTNTEXT));
     HGDIOBJ previous = ::SelectObject(dc, title_font_);
     RECT title_rect = {S(20), S(4), client.right - S(20), S(kHeaderHeight - 6)};
-    ::DrawTextW(dc, kWindowTitle, -1, &title_rect,
+    const std::wstring header = Loc("ShortCutManForm.ShortCutManFormCaption");
+    ::DrawTextW(dc, header.c_str(), -1, &title_rect,
                 DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
     ::SelectObject(dc, previous);
 

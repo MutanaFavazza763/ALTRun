@@ -11,12 +11,12 @@
 
 #include "core/Logger.h"
 #include "core/Text.h"
+#include "ui/UiText.h"
 
 namespace alt {
 namespace {
 
 constexpr wchar_t kWindowClass[] = L"ALTRun.ConfigWindow.v2";
-constexpr wchar_t kWindowTitle[] = L"ALTRun 设置";
 // Version string shown on the 调试/关于 tab (single source of truth; the
 // original read about text from About.<Lang>, which the rewrite does not ship).
 constexpr wchar_t kVersion[] = L"ALTRun C++ rewrite (dev)";
@@ -58,47 +58,54 @@ constexpr int kCheckColumnOffset = 340;
 // ---------------------------------------------------------------------------
 
 struct CheckSpec {
-    const wchar_t* label;
+    const char* key;  // legacy .lang key, resolved through Localization
     bool Settings::*field;
 };
 
 struct IntSpec {
-    const wchar_t* label;
+    const char* key;
     int Settings::*field;
     int min_value;
     int max_value;
 };
 
-// [Config] page 1 -- 13 checkboxes (task list order).
+// [Config] page 1 -- 13 checkboxes (task list order).  The legacy dialog had the
+// same list as ConfigForm.ConfigList_0..19, so the keys are reused verbatim.
 const CheckSpec kGeneralChecks[] = {
-    {L"允许正则表达式（通配符 * 和 ?）", &Settings::regex_mode},
-    {L"从任意位置匹配关键字", &Settings::match_anywhere},
-    {L"允许数字快捷键", &Settings::number_key},
-    {L"数字序列顺序为 0..9（否则 1..9,0）", &Settings::index_from_0_to_9},
-    {L"记住最近一次匹配项", &Settings::remember_favourite_match},
-    {L"仅显示前 10 项", &Settings::show_top_ten},
-    {L"仅剩一项时立即执行", &Settings::execute_if_only_one},
-    {L"执行快捷项后退出程序", &Settings::exit_when_execute},
-    {L"显示命令行", &Settings::show_command_line},
-    {L"显示操作提示", &Settings::show_operation_hint},
-    {L"随系统自动启动", &Settings::auto_run},
-    {L"添加到“发送到”菜单", &Settings::add_to_send_to},
-    {L"启动时显示主窗口", &Settings::show_me_when_start},
+    {"ConfigForm.ConfigList_2", &Settings::regex_mode},
+    {"ConfigForm.ConfigList_3", &Settings::match_anywhere},
+    {"ConfigForm.ConfigList_4", &Settings::number_key},
+    {"ConfigForm.ConfigList_5", &Settings::index_from_0_to_9},
+    {"ConfigForm.ConfigList_6", &Settings::remember_favourite_match},
+    {"ConfigForm.ConfigList_10", &Settings::show_top_ten},
+    {"ConfigForm.ConfigList_19", &Settings::execute_if_only_one},
+    {"ConfigForm.ConfigList_12", &Settings::exit_when_execute},
+    {"ConfigForm.ConfigList_8", &Settings::show_command_line},
+    {"ConfigForm.ConfigList_7", &Settings::show_operation_hint},
+    {"ConfigForm.ConfigList_0", &Settings::auto_run},
+    {"ConfigForm.ConfigList_1", &Settings::add_to_send_to},
+    {"ConfigForm.ConfigList_14", &Settings::show_me_when_start},
 };
 
 // [Config] numeric keys that the legacy ini keeps but the old dialog had no
 // widget for (docs/spec/02-config-options.md §1.3).
 const IntSpec kGeneralInts[] = {
-    {L"自动隐藏延时（秒）", &Settings::hide_delay, 0, 3600},
-    {L"参数历史记录条数", &Settings::param_history_limit, 0, 1000},
+    {"resHideDelay", &Settings::hide_delay, 0, 3600},
+    {"resParamHistoryLimit", &Settings::param_history_limit, 0, 1000},
 };
 
 const CheckSpec kAppearanceChecks[] = {
-    {L"显示皮肤", &Settings::show_skin},
-    {L"显示托盘图标", &Settings::show_tray_icon},
-    {L"弹出时播放提示音", &Settings::play_popup_notify},
-    {L"启动时显示气泡提示", &Settings::show_start_notification},
+    {"ConfigForm.ConfigList_13", &Settings::show_skin},
+    {"ConfigForm.ConfigList_15", &Settings::show_tray_icon},
+    {"ConfigForm.ConfigList_11", &Settings::play_popup_notify},
+    {"ConfigForm.ConfigList_9", &Settings::show_start_notification},
 };
+
+// Tab strip.  The legacy dialog had 配置/热键/字体/窗体/语言; the rewrite folds
+// font/form/language into one 外观 page and adds a debug page, so only the
+// first two tabs map 1:1 to a legacy key.
+const char* const kTabKeys[] = {"ConfigForm.PageConfig", "ConfigForm.PageHotKey",
+                                "ConfigForm.PageForm", "resPageDebug"};
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -312,7 +319,8 @@ bool ConfigWindow::CreateConfigWindow(HINSTANCE instance) {
     // WS_CLIPCHILDREN keeps the native child controls from being painted over
     // by the parent background erase; the popup/tool-window/topmost combination
     // matches MainWindow and ParamWindow.
-    if (!Create(instance, kWindowClass, kWindowTitle,
+    if (!Create(instance, kWindowClass,
+                L"ALTRun " + Loc("ConfigForm.ConfigFormCaption"),
                 WS_POPUP | WS_CLIPCHILDREN, WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) {
         return false;
     }
@@ -369,11 +377,12 @@ void ConfigWindow::ApplyFont(HWND control) const {
 }
 
 HWND ConfigWindow::MakeControl(int page, const wchar_t* class_name,
-                               const wchar_t* text, DWORD style, int x, int y,
-                               int width, int height, int id) {
+                               const std::wstring& text, DWORD style, int x,
+                               int y, int width, int height, int id) {
     HWND control = ::CreateWindowExW(
-        0, class_name, text, style, S(x), S(y), S(width), S(height), hwnd_,
-        reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance_, nullptr);
+        0, class_name, text.c_str(), style, S(x), S(y), S(width), S(height),
+        hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)), instance_,
+        nullptr);
     if (control == nullptr) {
         Logger::Instance().Warn(std::string("config window: cannot create ") +
                                 ToUtf8(class_name));
@@ -386,15 +395,15 @@ HWND ConfigWindow::MakeControl(int page, const wchar_t* class_name,
     return control;
 }
 
-HWND ConfigWindow::AddLabel(int page, const wchar_t* text, int x, int y,
+HWND ConfigWindow::AddLabel(int page, const std::wstring& text, int x, int y,
                             int width, int height, DWORD extra_style) {
     return MakeControl(page, WC_STATICW, text,
                        WS_CHILD | SS_CENTERIMAGE | extra_style, x, y, width,
                        height, 0);
 }
 
-HWND ConfigWindow::AddCheckBox(int page, const wchar_t* text, int x, int y,
-                               int width) {
+HWND ConfigWindow::AddCheckBox(int page, const std::wstring& text, int x,
+                               int y, int width) {
     HWND box = MakeControl(page, WC_BUTTONW, text,
                            WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, x, y, width,
                            kRowHeight, 0);
@@ -405,7 +414,7 @@ HWND ConfigWindow::AddCheckBox(int page, const wchar_t* text, int x, int y,
     return box;
 }
 
-HWND ConfigWindow::AddIntEdit(int page, const wchar_t* label,
+HWND ConfigWindow::AddIntEdit(int page, const std::wstring& label,
                               int Settings::*field, int min_value, int max_value,
                               int x, int y, int label_width, int edit_width) {
     AddLabel(page, label, x, y, label_width);
@@ -424,7 +433,7 @@ HWND ConfigWindow::AddIntEdit(int page, const wchar_t* label,
     return edit;
 }
 
-HWND ConfigWindow::AddTextEdit(int page, const wchar_t* label,
+HWND ConfigWindow::AddTextEdit(int page, const std::wstring& label,
                                std::string Settings::*field, int x, int y,
                                int label_width, int edit_width) {
     AddLabel(page, label, x, y, label_width);
@@ -442,7 +451,7 @@ HWND ConfigWindow::AddTextEdit(int page, const wchar_t* label,
     return edit;
 }
 
-HWND ConfigWindow::AddHotkeyEdit(int page, const wchar_t* label,
+HWND ConfigWindow::AddHotkeyEdit(int page, const std::wstring& label,
                                  std::string Settings::*field, int x, int y,
                                  int label_width, int edit_width) {
     AddLabel(page, label, x, y, label_width);
@@ -457,7 +466,7 @@ HWND ConfigWindow::AddHotkeyEdit(int page, const wchar_t* label,
     if (edit != nullptr) {
         texts_.push_back(TextBinding{edit, field});
         ::SendMessageW(edit, EM_SETCUEBANNER, TRUE,
-                       reinterpret_cast<LPARAM>(L"点击后按下组合键，Delete 清除"));
+                       reinterpret_cast<LPARAM>(Loc("resHotkeyCue").c_str()));
         ::SendMessageW(edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN,
                        MAKELPARAM(S(4), S(4)));
         ::SetWindowSubclass(edit, &ConfigWindow::HotkeySubclassProc, 1,
@@ -479,7 +488,7 @@ void ConfigWindow::CreateGeneralPage() {
     for (int index = 0; index < check_count; ++index) {
         const int column = index < kChecksPerColumn ? 0 : 1;
         const int row = index < kChecksPerColumn ? index : index - kChecksPerColumn;
-        HWND box = AddCheckBox(kPageGeneral, kGeneralChecks[index].label,
+        HWND box = AddCheckBox(kPageGeneral, Loc(kGeneralChecks[index].key),
                                kPageLeft + column * kCheckColumnOffset,
                                kPageTop + 8 + row * kRowStep,
                                kCheckColumnWidth);
@@ -490,57 +499,54 @@ void ConfigWindow::CreateGeneralPage() {
 
     const int int_count = static_cast<int>(std::size(kGeneralInts));
     for (int index = 0; index < int_count; ++index) {
-        AddIntEdit(kPageGeneral, kGeneralInts[index].label,
+        AddIntEdit(kPageGeneral, Loc(kGeneralInts[index].key),
                    kGeneralInts[index].field, kGeneralInts[index].min_value,
                    kGeneralInts[index].max_value, kPageLeft,
                    kPageTop + 216 + index * 32, 140, 80);
     }
 
-    AddLabel(kPageGeneral,
-             L"提示：延时为 0 时主窗口弹出后立即隐藏；参数历史条数为 0 时关闭参数历史记录。",
-             kPageLeft, kPageTop + 296, 620);
+    AddLabel(kPageGeneral, Loc("resGeneralPageHint"), kPageLeft,
+             kPageTop + 296, 620);
 }
 
 void ConfigWindow::CreateHotkeyPage() {
     // Hotkey capture writes directly into the text box only; Settings is
     // touched when 确定 is pressed (single write-back point, see class comment).
-    AddHotkeyEdit(kPageHotkey, L"主热键（显示/隐藏主窗口）", &Settings::hotkey1,
+    AddHotkeyEdit(kPageHotkey, Loc("ConfigForm.LblHotKey1"), &Settings::hotkey1,
                   kPageLeft, kPageTop + 8, 200, 380);
-    AddHotkeyEdit(kPageHotkey, L"辅助热键（留空表示禁用）", &Settings::hotkey2,
+    AddHotkeyEdit(kPageHotkey, Loc("ConfigForm.LblHotKey2"), &Settings::hotkey2,
                   kPageLeft, kPageTop + 8 + kHotkeyStep, 200, 380);
-    AddHotkeyEdit(kPageHotkey, L"最近一项热键（直接执行）",
+    AddHotkeyEdit(kPageHotkey, Loc("resLastItemHotKey"),
                   &Settings::last_item_hotkey, kPageLeft,
                   kPageTop + 8 + 2 * kHotkeyStep, 200, 380);
 
-    AddLabel(kPageHotkey,
-             L"点击输入框后直接按下组合键即可捕获，例如 Alt + R；按 Delete 清除。",
-             kPageLeft, kPageTop + 144, 640);
-    AddLabel(kPageHotkey,
-             L"捕获时 Tab / Shift+Tab 用于切换焦点，Ctrl+Tab 才会被当作热键保存。",
-             kPageLeft, kPageTop + 168, 640);
-    AddLabel(kPageHotkey,
-             L"热键冲突或写法无法识别时，保存后可能注册失败，请留意托盘区域提示。",
-             kPageLeft, kPageTop + 192, 640);
+    AddLabel(kPageHotkey, Loc("resHotkeyHint1"), kPageLeft, kPageTop + 144,
+             640);
+    AddLabel(kPageHotkey, Loc("resHotkeyHint2"), kPageLeft, kPageTop + 168,
+             640);
+    AddLabel(kPageHotkey, Loc("resHotkeyHint3"), kPageLeft, kPageTop + 192,
+             640);
 }
 
 void ConfigWindow::CreateAppearancePage() {
-    AddIntEdit(kPageAppearance, L"窗体宽度", &Settings::form_width, 200, 800,
-               kPageLeft, kPageTop + 8, 120, 80);
-    AddIntEdit(kPageAppearance, L"不透明度（0-255）", &Settings::alpha, 0, 255,
-               kPageLeft, kPageTop + 44, 120, 80);
-    AddIntEdit(kPageAppearance, L"圆角半径（0-200）",
+    AddIntEdit(kPageAppearance, Loc("ConfigForm.lblFormWidth"),
+               &Settings::form_width, 200, 800, kPageLeft, kPageTop + 8, 120,
+               80);
+    AddIntEdit(kPageAppearance, Loc("ConfigForm.LblFormAlpha"), &Settings::alpha,
+               0, 255, kPageLeft, kPageTop + 44, 120, 80);
+    AddIntEdit(kPageAppearance, Loc("ConfigForm.lblRoundBorderRadius"),
                &Settings::round_border_radius, 0, 200, kPageLeft,
                kPageTop + 80, 120, 80);
-    AddTextEdit(kPageAppearance, L"语言", &Settings::lang, kPageLeft,
-                kPageTop + 116, 120, 80);
-    AddTextEdit(kPageAppearance, L"背景图片文件名", &Settings::bg_file_name,
-                kPageLeft, kPageTop + 152, 120, 220);
+    AddTextEdit(kPageAppearance, Loc("ConfigForm.LblLanguage"), &Settings::lang,
+                kPageLeft, kPageTop + 116, 120, 80);
+    AddTextEdit(kPageAppearance, Loc("ConfigForm.LblBackGroundImage"),
+                &Settings::bg_file_name, kPageLeft, kPageTop + 152, 120, 220);
 
     const int check_count = static_cast<int>(std::size(kAppearanceChecks));
     for (int index = 0; index < check_count; ++index) {
         const int column = index % 2;
         const int row = index / 2;
-        HWND box = AddCheckBox(kPageAppearance, kAppearanceChecks[index].label,
+        HWND box = AddCheckBox(kPageAppearance, Loc(kAppearanceChecks[index].key),
                                kPageLeft + column * 170,
                                kPageTop + 196 + row * kRowStep, 160);
         if (box != nullptr) {
@@ -550,7 +556,7 @@ void ConfigWindow::CreateAppearancePage() {
 
     // ListFormat: legacy editable drop-down with the three presets the
     // original dialog offered (docs/spec/02-config-options.md §3.5).
-    AddLabel(kPageAppearance, L"列表格式（必须包含两个 %s）", kPageLeft + 360,
+    AddLabel(kPageAppearance, Loc("ConfigForm.LblListFormat"), kPageLeft + 360,
              kPageTop + 8, 280);
     HWND combo = MakeControl(kPageAppearance, WC_COMBOBOXW, L"",
                              WS_CHILD | WS_TABSTOP | CBS_DROPDOWN |
@@ -575,12 +581,10 @@ void ConfigWindow::CreateAppearancePage() {
                             reinterpret_cast<DWORD_PTR>(this));
     }
 
-    AddLabel(kPageAppearance,
-             L"列表格式必须且只能包含两个 %s（关键字、名称）。", kPageLeft,
+    AddLabel(kPageAppearance, Loc("resListFormatHint"), kPageLeft,
              kPageTop + 296, 660);
-    AddLabel(kPageAppearance,
-             L"修改宽度/透明度/语言后，部分界面需要重启 ALTRun 才能完全生效。",
-             kPageLeft, kPageTop + 320, 660);
+    AddLabel(kPageAppearance, Loc("resAppearanceHint"), kPageLeft,
+             kPageTop + 320, 660);
 }
 
 void ConfigWindow::CreateAboutPage() {
@@ -588,19 +592,21 @@ void ConfigWindow::CreateAboutPage() {
     ini_path_text_ = AddLabel(kPageAbout, L"", kPageLeft, kPageTop + 36, 660,
                               kRowHeight, SS_PATHELLIPSIS);
     run_count_text_ = AddLabel(kPageAbout, L"", kPageLeft, kPageTop + 64, 400);
-
-    HWND trace = AddCheckBox(kPageAbout, L"启用调试日志（TraceEnable）", kPageLeft,
+    HWND trace = AddCheckBox(kPageAbout, Loc("resTraceEnable"), kPageLeft,
                              kPageTop + 100, 300);
     if (trace != nullptr) {
         bools_.push_back(BoolBinding{trace, &Settings::trace_enabled});
     }
 
-    AddLabel(kPageAbout, L"相关文件（与 ALTRun.exe 同目录）：", kPageLeft,
+    AddLabel(kPageAbout, Loc("resRelatedFiles"), kPageLeft,
              kPageTop + 148, 400);
     const std::wstring directory = ExeDirectory();
-    const std::wstring param_history = L"参数历史文件：" + directory + L"ParamHistory.txt";
-    const std::wstring shortcut_list = L"快捷项列表：" + directory + L"ShortCutList.txt";
-    const std::wstring favourite_list = L"收藏映射：" + directory + L"FavoriteList.txt";
+    const std::wstring param_history =
+        Loc("resParamHistoryFile") + directory + L"ParamHistory.txt";
+    const std::wstring shortcut_list =
+        Loc("resShortcutListFile") + directory + L"ShortCutList.txt";
+    const std::wstring favourite_list =
+        Loc("resFavoriteListFile") + directory + L"FavoriteList.txt";
     AddLabel(kPageAbout, param_history.c_str(), kPageLeft, kPageTop + 176, 660,
              kRowHeight, SS_PATHELLIPSIS);
     AddLabel(kPageAbout, shortcut_list.c_str(), kPageLeft, kPageTop + 200, 660,
@@ -608,9 +614,8 @@ void ConfigWindow::CreateAboutPage() {
     AddLabel(kPageAbout, favourite_list.c_str(), kPageLeft, kPageTop + 224, 660,
              kRowHeight, SS_PATHELLIPSIS);
 
-    AddLabel(kPageAbout,
-             L"TraceEnable 修改后需重启 ALTRun 才会生效；日志写入 %LOCALAPPDATA%\\ALTRun\\altRun.log。",
-             kPageLeft, kPageTop + 264, 660);
+    AddLabel(kPageAbout, Loc("resTraceEnableHint"), kPageLeft, kPageTop + 264,
+             660);
 }
 
 void ConfigWindow::OnCreate() {
@@ -635,23 +640,22 @@ void ConfigWindow::OnCreate() {
     ::SetWindowSubclass(tab_, &ConfigWindow::ChildSubclassProc, 1,
                         reinterpret_cast<DWORD_PTR>(this));
 
-    const wchar_t* const kTabLabels[kPageCount] = {L"常规", L"热键", L"外观",
-                                                   L"调试/关于"};
     for (int index = 0; index < kPageCount; ++index) {
+        const std::wstring label = Loc(kTabKeys[index]);
         TCITEMW item = {};
         item.mask = TCIF_TEXT;
-        item.pszText = const_cast<LPWSTR>(kTabLabels[index]);
+        item.pszText = const_cast<LPWSTR>(label.c_str());
         TabCtrl_InsertItem(tab_, index, &item);
     }
 
     CreateControls();
 
     const int ok_x = kWindowWidth - kMargin - 2 * kButtonWidth - kButtonGap;
-    ok_button_ = MakeControl(-1, WC_BUTTONW, L"确定",
+    ok_button_ = MakeControl(-1, WC_BUTTONW, Loc("Common.BtnOK"),
                              WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                              ok_x, kButtonY, kButtonWidth, kButtonHeight, IDOK);
     cancel_button_ = MakeControl(
-        -1, WC_BUTTONW, L"取消",
+        -1, WC_BUTTONW, Loc("Common.BtnCancel"),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
         kWindowWidth - kMargin - kButtonWidth, kButtonY, kButtonWidth,
         kButtonHeight, IDCANCEL);
@@ -708,14 +712,14 @@ void ConfigWindow::SaveFromControls() {
 }
 
 void ConfigWindow::UpdateAboutTexts() {
-    SetControlText(version_text_, std::wstring(L"版本：") + kVersion);
+    SetControlText(version_text_, Loc("resLabelVersion") + kVersion);
     std::wstring ini_path = settings_.ini_path;
     if (ini_path.empty()) {
         ini_path = ExeDirectory() + L"ALTRun.ini";
     }
-    SetControlText(ini_path_text_, L"配置文件：" + ini_path);
+    SetControlText(ini_path_text_, Loc("resAboutIniPath") + ini_path);
     SetControlText(run_count_text_,
-                   L"已执行快捷项次数：" +
+                   Loc("resAboutRunCount") +
                        std::to_wstring(settings_.shortcut_run_count));
 }
 
@@ -882,7 +886,9 @@ void ConfigWindow::DrawHeader(HDC dc) const {
     ::SetTextColor(dc, ::GetSysColor(COLOR_BTNTEXT));
     HGDIOBJ previous = ::SelectObject(dc, title_font_);
     RECT title = {S(20), S(4), client.right - S(20), S(kHeaderHeight - 6)};
-    ::DrawTextW(dc, kWindowTitle, -1, &title,
+    const std::wstring header =
+        L"ALTRun " + Loc("ConfigForm.ConfigFormCaption");
+    ::DrawTextW(dc, header.c_str(), -1, &title,
                 DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
     ::SelectObject(dc, previous);
 

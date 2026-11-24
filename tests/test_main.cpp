@@ -11,6 +11,8 @@
 //   * ShortcutStore  legacy ShortCutList.txt line parsing/serialisation
 //   * ParamHistory   rank bump + smallest-rank eviction
 //   * ShortcutSource path/URL derivation and relative path conversion
+//   * Localization   every legacy/res* key resolves in EN and 简体中文 without
+//                    a .lang file (built-in 224-key table + res* table)
 
 #include <windows.h>
 #include <objbase.h>
@@ -31,6 +33,10 @@
 #include "core/ShortcutSource.h"
 #include "core/ShortcutStore.h"
 #include "core/Text.h"
+
+// Generated list of every key the UI can request (legacy + res*).  See
+// 08-tools/generate_test_loc_keys.py.
+#include "LocalizationKeys.inc"
 
 namespace {
 
@@ -420,6 +426,38 @@ void TestLocalization() {
     // Unknown keys fall back to the key itself.
     CHECK(loc.Get("no.such.key") == L"no.such.key");
     CHECK(loc.Text("resNoMatch") == loc.Get("resNoMatch"));
+
+    // Every key the UI can request must resolve in both languages, with no
+    // <Lang>.lang file present.  The list is generated from the built-in
+    // tables by 08-tools/generate_test_loc_keys.py.
+    loc.Load("EN");
+    CHECK(loc.lang() == "EN");
+    for (const char* key : kLocalizationKeys) {
+        const std::wstring value = loc.Get(key);
+        ++g_checks;
+        // An empty value is legitimate (ConfigForm.VoidHotKey means "no
+        // hotkey"); only a fall-through to the key itself is a failure.
+        if (alt::ToUtf8(value) == key) {
+            Fail(key, __FILE__, __LINE__, "EN lookup fell through to the key");
+        }
+    }
+
+    loc.Load("简体中文");
+    CHECK(loc.lang() == "简体中文");
+    for (const char* key : kLocalizationKeys) {
+        const std::wstring value = loc.Get(key);
+        ++g_checks;
+        if (alt::ToUtf8(value) == key) {
+            Fail(key, __FILE__, __LINE__, "zh lookup fell through to the key");
+        }
+    }
+
+    // The reload used by ApplySettings() must not lose the built-in table.
+    loc.Load("EN");
+    CHECK(loc.Get("ConfigForm.ConfigList_0") == L"Auto run me when Windows start");
+    loc.Load("简体中文");
+    CHECK(loc.Get("ConfigForm.ConfigList_0") == L"随系统自动启动");
+    loc.Load("EN");
 }
 
 }  // namespace

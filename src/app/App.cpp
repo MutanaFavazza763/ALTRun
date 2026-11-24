@@ -297,13 +297,21 @@ void App::OnTrayCallback(LPARAM lparam) {
 }
 
 void App::ShowTrayMenu() {
+    // app must not depend on ui/UiText.h (layering is ui -> app -> core), so the
+    // lookup goes straight through Localization here.
+    const Localization& text = Localization::Instance();
     HMENU menu = ::CreatePopupMenu();
-    ::AppendMenuW(menu, MF_STRING, kTrayMenuShow, L"打开 ALTRun(&O)");
-    ::AppendMenuW(menu, MF_STRING, kTrayMenuManager, L"快捷项管理(&M)");
-    ::AppendMenuW(menu, MF_STRING, kTrayMenuConfig, L"设置(&S)");
-    ::AppendMenuW(menu, MF_STRING, kTrayMenuAbout, L"关于(&A)");
+    ::AppendMenuW(menu, MF_STRING, kTrayMenuShow,
+                  text.Get("resMenuShow").c_str());
+    ::AppendMenuW(menu, MF_STRING, kTrayMenuManager,
+                  text.Get("resMenuManager").c_str());
+    ::AppendMenuW(menu, MF_STRING, kTrayMenuConfig,
+                  text.Get("resMenuConfig").c_str());
+    ::AppendMenuW(menu, MF_STRING, kTrayMenuAbout,
+                  text.Get("Common.MenuAbout").c_str());
     ::AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    ::AppendMenuW(menu, MF_STRING, kTrayMenuExit, L"退出(&X)");
+    ::AppendMenuW(menu, MF_STRING, kTrayMenuExit,
+                  text.Get("Common.MenuClose").c_str());
 
     POINT cursor = {};
     ::GetCursorPos(&cursor);
@@ -326,7 +334,7 @@ void App::AddTrayIcon() {
     tray_icon_.uCallbackMessage = kTrayCallbackMessage;
     tray_icon_.hIcon = ::LoadIconW(nullptr, IDI_APPLICATION);
     ::StringCchCopyW(tray_icon_.szTip, std::size(tray_icon_.szTip),
-                      L"ALTRun - Alt+R 打开");
+                     Localization::Instance().Get("resTrayTip").c_str());
     tray_visible_ = ::Shell_NotifyIconW(NIM_ADD, &tray_icon_) != FALSE;
     if (!tray_visible_) {
         Logger::Instance().Warn("failed to add tray icon, error=" +

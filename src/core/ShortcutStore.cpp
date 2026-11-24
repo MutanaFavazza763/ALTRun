@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "core/Encoding.h"
+#include "core/Localization.h"
 #include "core/Logger.h"
 #include "core/Text.h"
 
@@ -518,12 +519,16 @@ void ShortcutStore::SeedDefaultsIfMissing() {
         return;
     }
 
-    auto add = [this](std::string keyword, std::string name, ParamType type,
+    // The display name comes from [DefaultShortCutName] of the active language
+    // file, exactly like the original (it wrote its own localized names into a
+    // fresh ShortCutList.txt).
+    auto add = [this](std::string keyword, const char* name_key, ParamType type,
                       std::string command_line, int freq) {
+        const std::string name = ToUtf8(Localization::Instance().Get(name_key));
         ShortcutEntry entry;
         entry.item.param_type = type;
         entry.item.keyword = std::move(keyword);
-        entry.item.name = std::move(name);
+        entry.item.name = name;
         entry.item.command_line = std::move(command_line);
         entry.item.freq = freq;
         entries_.push_back(std::move(entry));
@@ -537,54 +542,77 @@ void ShortcutStore::SeedDefaultsIfMissing() {
     // Mirrors the built-in list of the original launcher
     // (docs/spec/03-shortcut-model.md §9.3). WinCtl.exe based entries are kept
     // for fidelity even though that helper binary is not shipped.
-    add("Computer", "我的电脑", ParamType::None,
+    add("Computer", "DefaultShortCutName.Default_ShortCut_Name_0", ParamType::None,
         "::{20D04FE0-3AEA-1069-A2D8-08002B30309D}", 100);
-    add("Explorer", "资源管理器", ParamType::None,
+    add("Explorer", "DefaultShortCutName.Default_ShortCut_Name_1", ParamType::None,
         "explorer.exe /e,::{20D04FE0-3AEA-1069-A2D8-08002B30309D}", 0);
-    add("MyDocument", "我的文档", ParamType::None, "explorer.exe", 0);
-    add("ie", "IE浏览器", ParamType::None, "iexplore.exe", 8);
-    add("notepad", "记事本", ParamType::None, "notepad", 7);
-    add("mspaint", "画图", ParamType::None, "mspaint", 0);
-    add("cmd", "Dos窗口", ParamType::NoEncoding, "cmd /k %p", 6);
-    add("Calc", "计算器", ParamType::None, "calc", 5);
-    add("msconfig", "系统配置", ParamType::None, "msconfig", 0);
-    add("Reg", "注册表编辑器", ParamType::None, "regedt32", 4);
-    add("myip", "我的IP地址", ParamType::None, "nslookup", 0);
-    add("dev", "设备管理器", ParamType::None, "devmgmt.msc", 0);
-    add("Taskmgr", "任务管理器", ParamType::None, "taskmgr", 0);
-    add("ShutDown", "立即关机", ParamType::None, "shutdown /s /t 5", 0);
-    add("Reboot", "立即重启", ParamType::None, "shutdown /r /t 5", 0);
+    add("MyDocument", "DefaultShortCutName.Default_ShortCut_Name_2",
+        ParamType::None, "explorer.exe", 0);
+    add("ie", "DefaultShortCutName.Default_ShortCut_Name_3", ParamType::None,
+        "iexplore.exe", 8);
+    add("notepad", "DefaultShortCutName.Default_ShortCut_Name_4", ParamType::None,
+        "notepad", 7);
+    add("mspaint", "DefaultShortCutName.Default_ShortCut_Name_5", ParamType::None,
+        "mspaint", 0);
+    add("cmd", "DefaultShortCutName.Default_ShortCut_Name_6",
+        ParamType::NoEncoding, "cmd /k %p", 6);
+    add("Calc", "DefaultShortCutName.Default_ShortCut_Name_7", ParamType::None,
+        "calc", 5);
+    add("msconfig", "DefaultShortCutName.Default_ShortCut_Name_9", ParamType::None,
+        "msconfig", 0);
+    add("Reg", "DefaultShortCutName.Default_ShortCut_Name_10", ParamType::None,
+        "regedt32", 4);
+    add("myip", "DefaultShortCutName.Default_ShortCut_Name_11", ParamType::None,
+        "nslookup", 0);
+    add("dev", "DefaultShortCutName.Default_ShortCut_Name_12", ParamType::None,
+        "devmgmt.msc", 0);
+    add("Taskmgr", "DefaultShortCutName.Default_ShortCut_Name_13",
+        ParamType::None, "taskmgr", 0);
+    add("ShutDown", "DefaultShortCutName.Default_ShortCut_Name_14",
+        ParamType::None, "shutdown /s /t 5", 0);
+    add("Reboot", "DefaultShortCutName.Default_ShortCut_Name_15", ParamType::None,
+        "shutdown /r /t 5", 0);
     blank();
-    add("Windows", "Windows 目录", ParamType::None, "%WINDIR%", 0);
-    add("System32", "System32 目录", ParamType::None, "%WINDIR%\\System32", 0);
-    add("ProgramFiles", "Program Files 目录", ParamType::None, "%PROGRAMFILES%", 0);
-    add("Recent", "最近打开文件 目录", ParamType::None, "%USERPROFILE%\\Recent", 10);
+    add("Windows", "DefaultShortCutName.Default_ShortCut_Name_16",
+        ParamType::None, "%WINDIR%", 0);
+    add("System32", "DefaultShortCutName.Default_ShortCut_Name_17",
+        ParamType::None, "%WINDIR%\\System32", 0);
+    add("ProgramFiles", "DefaultShortCutName.Default_ShortCut_Name_18",
+        ParamType::None, "%PROGRAMFILES%", 0);
+    add("Recent", "DefaultShortCutName.Default_ShortCut_Name_19", ParamType::None,
+        "%USERPROFILE%\\Recent", 10);
     blank();
-    add("b", "百度 搜索引擎", ParamType::UrlQuery, "http://www.baidu.com/s?wd=", 12);
-    add("g", "Google 搜索引擎", ParamType::Utf8Query,
+    add("b", "DefaultShortCutName.Default_ShortCut_Name_20", ParamType::UrlQuery,
+        "http://www.baidu.com/s?wd=", 12);
+    add("g", "DefaultShortCutName.Default_ShortCut_Name_21", ParamType::Utf8Query,
         "http://www.google.com/search?q=", 14);
-    add("s", "搜狗MP3 搜索引擎", ParamType::UrlQuery,
+    add("s", "DefaultShortCutName.Default_ShortCut_Name_22", ParamType::UrlQuery,
         "http://mp3.sogou.com/music.so?query=", 0);
-    add("zd", "百度知道 搜索引擎", ParamType::UrlQuery,
+    add("zd", "DefaultShortCutName.Default_ShortCut_Name_23", ParamType::UrlQuery,
         "http://zhidao.baidu.com/q?ct=17&pn=0&tn=ikaslist&rn=10&word=", 9);
-    add("v", "VeryCD 搜索引擎", ParamType::Utf8Query,
+    add("v", "DefaultShortCutName.Default_ShortCut_Name_24", ParamType::Utf8Query,
         "http://www.verycd.com/search/folders?kw=", 0);
-    add("y", "Yahoo 搜索引擎", ParamType::Utf8Query,
+    add("y", "DefaultShortCutName.Default_ShortCut_Name_25", ParamType::Utf8Query,
         "http://search.yahoo.com/search?p=", 0);
     blank();
-    add("Upgrade", "前往升级网址", ParamType::None,
-        "http://journeyboy.blog.sohu.com/112820379.html", 15);
-    add("Config", "编辑配置", ParamType::None, ".\\ALTRun.ini", 0);
+    add("Upgrade", "DefaultShortCutName.Default_ShortCut_Name_26",
+        ParamType::None, "http://journeyboy.blog.sohu.com/112820379.html", 15);
+    add("Config", "DefaultShortCutName.Default_ShortCut_Name_27", ParamType::None,
+        ".\\ALTRun.ini", 0);
     blank();
-    add("AddRemoveProgram", "添加/删除程序", ParamType::None, "appwiz.cpl", 0);
-    add("ControlPanel", "控制面板", ParamType::None, "control.exe", 0);
-    add("InternetConnection", "Internet控制", ParamType::None,
-        "control.exe Inetcpl.cpl ,4", 0);
-    add("SystemProperty", "系统属性", ParamType::None, "Sysdm.cpl", 0);
-    add("r", "运行", ParamType::NoEncoding, "{%p}", 100);
-    add("cb", "百度 搜索剪贴板", ParamType::UrlQuery,
+    add("AddRemoveProgram", "DefaultShortCutName.Default_ShortCut_Name_28",
+        ParamType::None, "appwiz.cpl", 0);
+    add("ControlPanel", "DefaultShortCutName.Default_ShortCut_Name_29",
+        ParamType::None, "control.exe", 0);
+    add("InternetConnection", "DefaultShortCutName.Default_ShortCut_Name_30",
+        ParamType::None, "control.exe Inetcpl.cpl ,4", 0);
+    add("SystemProperty", "DefaultShortCutName.Default_ShortCut_Name_31",
+        ParamType::None, "Sysdm.cpl", 0);
+    add("r", "DefaultShortCutName.Default_ShortCut_Name_32", ParamType::NoEncoding,
+        "{%p}", 100);
+    add("cb", "DefaultShortCutName.Default_ShortCut_Name_33", ParamType::UrlQuery,
         "http://www.baidu.com/s?wd={%c}", 12);
-    add("cg", "Google 搜索剪贴板", ParamType::Utf8Query,
+    add("cg", "DefaultShortCutName.Default_ShortCut_Name_34", ParamType::Utf8Query,
         "http://www.google.com/search?q={%c}", 24);
 
     Save();

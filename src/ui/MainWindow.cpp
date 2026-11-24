@@ -15,6 +15,7 @@
 #include "core/Logger.h"
 #include "core/Text.h"
 #include "ui/ParamWindow.h"
+#include "ui/UiText.h"
 
 namespace alt {
 namespace {
@@ -49,11 +50,9 @@ const D2D1_COLOR_F kTextDim = D2D1::ColorF(0.541f, 0.569f, 0.612f, 1.0f);
 const D2D1_COLOR_F kAccent = D2D1::ColorF(0.361f, 0.659f, 0.988f, 1.0f);
 const D2D1_COLOR_F kCaret = D2D1::ColorF(0.361f, 0.659f, 0.988f, 1.0f);
 
-// Localized resource lookup (see core/Localization; original key names are
-// documented in docs/spec/02-config-options.md §1.8/§6.2).
-std::wstring Loc(const char* key) {
-    return Localization::Instance().Get(key);
-}
+// Localized resource lookup lives in ui/UiText.h so every window shares it
+// (see core/Localization; original key names are documented in
+// docs/spec/02-config-options.md §1.8/§6.2).
 
 // FontSpec sizes are points (Delphi TFont.Size); DirectWrite takes DIPs
 // (1 DIP = 1/96 inch, 1 pt = 1/72 inch).

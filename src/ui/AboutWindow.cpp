@@ -8,12 +8,12 @@
 #include "core/Localization.h"
 #include "core/Logger.h"
 #include "core/Text.h"
+#include "ui/UiText.h"
 
 namespace alt {
 namespace {
 
 constexpr wchar_t kWindowClass[] = L"ALTRun.AboutWindow.v2";
-constexpr wchar_t kWindowTitle[] = L"关于 ALTRun";
 constexpr wchar_t kVersion[] = L"2.0 (C++ rewrite)";
 
 // Layout in 96-DPI design units (scaled through AboutWindow::S()).
@@ -70,7 +70,8 @@ AboutWindow::AboutWindow(Settings& settings) : settings_(settings) {}
 AboutWindow::~AboutWindow() { DestroyResources(); }
 
 bool AboutWindow::CreateAboutWindow(HINSTANCE instance) {
-    if (!Create(instance, kWindowClass, kWindowTitle, WS_POPUP | WS_CLIPCHILDREN,
+    if (!Create(instance, kWindowClass, Loc("resAboutTitle"),
+                WS_POPUP | WS_CLIPCHILDREN,
                 WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) {
         return false;
     }
@@ -185,7 +186,7 @@ void AboutWindow::CreateControls() {
     }
 
     close_button_ = MakeControl(
-        WC_BUTTONW, L"关闭",
+        WC_BUTTONW, Loc("Common.BtnClose").c_str(),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
         kWindowWidth - kMargin - kButtonWidth, kButtonY, kButtonWidth,
         kButtonHeight, kIdClose);
@@ -321,7 +322,8 @@ void AboutWindow::DrawHeader(HDC dc) const {
     ::SetTextColor(dc, ::GetSysColor(COLOR_BTNTEXT));
     HGDIOBJ previous = ::SelectObject(dc, title_font_);
     RECT title = {S(20), S(4), client.right - S(20), S(kHeaderHeight - 6)};
-    ::DrawTextW(dc, kWindowTitle, -1, &title,
+    const std::wstring header = Loc("resAboutTitle");
+    ::DrawTextW(dc, header.c_str(), -1, &title,
                 DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
     ::SelectObject(dc, previous);
 

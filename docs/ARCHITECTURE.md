@@ -40,7 +40,8 @@ src/
 │  ├─ Encoding.{h,cpp}      GBK ⇄ UTF-8、UTF-8 严格校验
 │  ├─ Text.{h,cpp}          UTF-8 ⇄ UTF-16、ASCII 大小写折叠
 │  ├─ FontSpec.{h,cpp}      旧版字体串 `字体名|[]|12|65535|0` 解析/序列化
-│  ├─ Localization.{h,cpp}  `<Lang>.lang` 加载 + 内置 EN/中文回退
+│  ├─ Localization.{h,cpp}  `<Lang>.lang` 加载 + 内置 224 键 EN/中文回退
+│  ├─ LocalizationBuiltin.inc  224 键内置表（由 08-tools 脚本生成，勿手改）
 │  ├─ Shortcut.{h,cpp}      快捷项模型 + ParamType 映射
 │  ├─ ShortcutSource.{h,cpp} 路径/URL/命令行 → 关键字推导、.lnk 解析、相对路径
 │  ├─ ShortcutStore.{h,cpp} ShortCutList.txt / FavoriteList.txt / LatestList
@@ -51,6 +52,7 @@ src/
 │  └─ Logger.{h,cpp}        altRun.log（可开关，带目录回退）
 └─ ui/
    ├─ Window.{h,cpp}        无边框窗口基类 + 消息分发
+   ├─ UiText.h              `Loc(key)` / `LocArg` / `LocArgInt`：全 UI 统一取词入口
    ├─ D2DContext.{h,cpp}    D2D/DWrite 资源封装（设备丢失重建）
    ├─ SkinImage.{h,cpp}     WIC 解码皮肤图（JPG/PNG/BMP）→ ID2D1Bitmap
    ├─ AboutWindow.{h,cpp}   关于窗口（版本、About.<Lang> 正文）
@@ -213,8 +215,15 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 - **字体**：`TitleFont/KeywordFont/ListFont` 沿用旧版五段格式（`Family|StyleSet|Size|TColor|Charset`），
   `FontSpec` 容错解析后用于创建 `IDWriteTextFormat`（磅值 → DIP 直接可用；`[fsBold]` → 粗体）。
 - **多语言**：`Localization` 读取 `<exe目录>\<Lang>.lang`（INI 风格，UTF-8/BOM/GBK/UTF-16 均可），
-  键查找顺序为 **文件 → 内置表 → 键名本身**；内置表覆盖主窗口文案（`resTitle`、`resItemCount`、
-  `resHintInput`、`resHintOperation`、`resNoMatch`、`resCannotExecute` 等），`EN` 与中文两套。
+  键查找顺序为 **`.lang` 文件 → 重写独有 `res*` 表 → 原版 224 键内置表 →（裸键时）按
+  `Section.Key` 后缀回退 → 键名本身**。内置的 224 条来自 `05-original-delphi-source/Bin`
+  的 `EN.lang` / `简体中文.lang`（8 个 section、键集完全一致），由
+  `08-tools/generate_builtin_table.py` 生成到 `LocalizationBuiltin.inc`，所以没有任何
+  `.lang` 文件时界面也能整段切换；自带 `.lang` 时该文件仍然逐键覆盖。
+  UI 侧统一走 `ui/UiText.h` 的 `Loc(key)`（`LocArg`/`LocArgInt` 处理带一个 `%s`/`%d`
+  的旧模板）。原版有对应键的照抄原版键（连措辞一起对齐），重写新增的控件用 `res*`
+  键；`ShortcutStore` 首次生成的默认列表名取自 `[DefaultShortCutName]`，因此中文
+  会写出"我的电脑"这类旧名（GBK 落盘，与旧版逐字节兼容），英文会写出 `My Computer`。
   修改 `Lang` 并确定后立即重新加载（无需重启）。
 - **提示音**：`ShowLauncher()` 成功后按 `PlayPopupNotify` 播放 `<exe目录>\Popup.wav`
   （`PlaySoundW`，`SND_ASYNC|SND_NODEFAULT`，缺失静默）。
@@ -263,10 +272,11 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | D19 | 字体串第 2 段按"样式集"、第 5 段按"字符集"解析 | 与规格 §1.7/§5.1 一致；若按相反映射，典型串 `SimSun\|[]\|12\|65535\|0` 结果相同，只有非空且冲突的串才有区别 |
 | D20 | 皮肤之上的面板固定 0.74 透明度，未与 `Alpha` 联动 | `Alpha` 仍作用于整窗分层透明度，保持原版"整窗半透明"语义；面板透明度用于保证文字可读 |
 | D21 | 不内嵌默认 `BG.jpg`/`Popup.wav` 资源 | 重写版无资源段；缺失时静默回退纯色/不播放（原版会从资源释放） |
-| D22 | 本地化目前只覆盖主窗口文案与关于窗动态字段 | 设置/管理器/编辑/参数窗仍是中文硬编码；外部 224 键 `.lang` 可加载且缺键回退 |
+| D22 | 本地化按 `.lang` 键重排，但**布局不变的控件沿用原版措辞** | 原版 VCL 表单的标签文案在 DFM 里、不在 `.lang`；这些控件用 `res*` 键写同样的意思，原版有键的（复选框、菜单、按钮）则连措辞一起对齐，长句（`ParamType_2/3`）只在管理器的宽列使用，编辑框单选改用短文案以免裁切 |
 | D23 | 关于窗 420×360（原版约 420×320） | 为容纳 7 行信息 + 可滚动正文 |
 | D24 | 唤出前检测虚拟桌面，必要时**重建**主窗（`DesktopSpace` + `App::RecreateMainWindow`） | Windows 无法把窗口搬到别的虚拟桌面；原版是 VCL `Show` 同样受此限制（表现为"热键没反应"）。重建后热键与托盘迁移到新 hwnd，查询失败时 fail-open 不重建 |
 | D25 | `ALTRun.ini` 若为 UTF-8 则启动时原地转 UTF-16 | Windows profile API 只认 ANSI 或带 BOM 的 UTF-16；Win11 记事本默认存 UTF-8，会让中文 `Lang`/字体名全变乱码。老 ANSI/GBK 文件不动，写回后仍由 profile API 维护 UTF-16 格式 |
+| D26 | 内置原版全部 224 键，并新增 72 个 `res*` 键；默认列表名走 `[DefaultShortCutName]` | 原版 `EN.lang`/`简体中文.lang` 各 224 键且键集一致，内置后可无文件切换；重写独有的控件文案（导入导出、参数提示、调试页等）在原版没有对应键，用 `res*` 补齐。默认列表的显示名本地化后，中文仍是旧名（GBK），英文为新译名——与原版"按当前语言写默认名"的行为一致 |
 
 ## 13. 构建、测试与打包
 
@@ -277,7 +287,7 @@ cmake --build build/vs --config Release
 
 # 产物：build/vs/Release/ALTRun.exe + altRunTests.exe（res/ 会一并复制）
 .\build\vs\Release\ALTRun.exe --show      # 开发期直接展示启动器
-.\build\vs\Release\altRunTests.exe        # 核心单元测试（116 项断言）
+.\build\vs\Release\altRunTests.exe        # 核心单元测试（720 项断言）
 ctest --test-dir build/vs -C Release      # 或通过 CTest 运行
 
 # 便携版打包（exe + res + 文档 + 样例 ALTRun.ini → dist/ALTRun-<版本>-win64.zip）

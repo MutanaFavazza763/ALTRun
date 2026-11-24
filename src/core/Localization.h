@@ -13,10 +13,11 @@ namespace alt {
 // qualified ("ALTRunForm.MainHint").  Files are usually ANSI/GBK but UTF-8
 // (with or without BOM) and UTF-16 LE/BE are accepted.
 //
-// Lookup order in Get(): loaded .lang file -> built-in table for the language
-// (EN = English, 简体中文/zh-* = Chinese) -> the key itself.  The built-in table
-// only covers the keys used by the rewrite; key names follow the original
-// res* variable naming style (原版键名见 docs/spec/02 §1.8 / §6.2).
+// Lookup order in Get(): loaded .lang file -> rewrite-only keys (res*) ->
+// built-in table for all 224 original keys (EN = English, 简体中文/zh-* =
+// Chinese) -> the key itself.  The built-in 224-key table is generated from the
+// legacy language files by 08-tools/generate_builtin_table.py into
+// LocalizationBuiltin.inc, so the fallback is complete instead of partial.
 class Localization {
 public:
     static Localization& Instance();
