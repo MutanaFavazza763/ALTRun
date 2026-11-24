@@ -4,6 +4,7 @@
 
 #include <string>
 
+#include "core/Encoding.h"
 #include "core/Logger.h"
 #include "core/Text.h"
 
@@ -73,6 +74,94 @@ void WriteStr(const std::wstring& ini, const wchar_t* section, const wchar_t* ke
     ::WritePrivateProfileStringW(section, key, ToWide(value).c_str(), ini.c_str());
 }
 
+// Windows' profile API reads ALTRun.ini as ANSI, or as UTF-16 when the file
+// carries a byte order mark. Nothing in between. Notepad on Windows 11 saves
+// UTF-8 by default, and then "Lang=简体中文" is read back as "绠€浣撲腑鏂", so the
+// launcher silently falls back to the built-in English strings (and the same
+// corruption would hit any non-ASCII font name or list format).
+//
+// Convert such a file to UTF-16 once, in place: every later read/write through
+// the profile API keeps the text intact. Legacy ANSI/GBK files are left
+// untouched, so old profiles stay byte compatible with the original binary.
+void NormalizeIniEncoding(const std::wstring& ini) {
+    HANDLE file = ::CreateFileW(ini.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        return;  // first run: nothing to normalise yet
+    }
+    LARGE_INTEGER file_size = {};
+    if (::GetFileSizeEx(file, &file_size) == FALSE || file_size.QuadPart <= 0 ||
+        file_size.QuadPart > 4 * 1024 * 1024) {
+        ::CloseHandle(file);
+        return;
+    }
+
+    std::string bytes(static_cast<size_t>(file_size.QuadPart), '\0');
+    DWORD read = 0;
+    const bool read_ok =
+        ::ReadFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &read,
+                   nullptr) != FALSE;
+    ::CloseHandle(file);
+    if (!read_ok) {
+        return;
+    }
+    bytes.resize(read);
+
+    // Already UTF-16 (either endianness): the profile API reads it as is.
+    if (bytes.size() >= 2 &&
+        ((bytes[0] == '\xFF' && bytes[1] == '\xFE') ||
+         (bytes[0] == '\xFE' && bytes[1] == '\xFF'))) {
+        return;
+    }
+
+    const bool has_bom =
+        bytes.size() >= 3 && bytes[0] == '\xEF' && bytes[1] == '\xBB' && bytes[2] == '\xBF';
+    const std::string body = has_bom ? bytes.substr(3) : bytes;
+
+    bool ascii_only = true;
+    for (const unsigned char c : body) {
+        if (c >= 0x80) {
+            ascii_only = false;
+            break;
+        }
+    }
+    if (ascii_only) {
+        return;  // plain ASCII reads identically either way
+    }
+    // A legacy GBK file is not valid UTF-8, so it stays ANSI.
+    if (!IsValidUtf8(body)) {
+        return;
+    }
+
+    const std::wstring wide = ToWide(body);
+    std::string utf16;
+    utf16.reserve(2 + wide.size() * 2);
+    utf16.push_back('\xFF');
+    utf16.push_back('\xFE');
+    for (const wchar_t ch : wide) {
+        utf16.push_back(static_cast<char>(ch & 0xFF));
+        utf16.push_back(static_cast<char>((ch >> 8) & 0xFF));
+    }
+
+    const std::wstring temp = ini + L".u8.tmp";
+    HANDLE out = ::CreateFileW(temp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                               FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (out == INVALID_HANDLE_VALUE) {
+        return;
+    }
+    DWORD written = 0;
+    const bool write_ok =
+        ::WriteFile(out, utf16.data(), static_cast<DWORD>(utf16.size()), &written,
+                    nullptr) != FALSE;
+    ::CloseHandle(out);
+    if (!write_ok || written != utf16.size() ||
+        ::MoveFileExW(temp.c_str(), ini.c_str(), MOVEFILE_REPLACE_EXISTING) == FALSE) {
+        ::DeleteFileW(temp.c_str());
+        return;
+    }
+    Logger::Instance().Info("settings: converted UTF-8 ini to UTF-16");
+}
+
 }  // namespace
 
 void Settings::Load() {
@@ -89,6 +178,7 @@ void Settings::Load() {
     }
 
     const std::wstring& ini = ini_path;
+    NormalizeIniEncoding(ini);
 
     hotkey1 = ReadString(ini, L"Config", L"HotKey1", hotkey1);
     hotkey2 = ReadString(ini, L"Config", L"HotKey2", hotkey2);

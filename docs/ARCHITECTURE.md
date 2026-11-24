@@ -33,7 +33,8 @@ src/
 ├─ app/                     进程级编排
 │  ├─ App.{h,cpp}           单实例、消息循环、托盘、热键分发、自启动
 │  ├─ Hotkey.{h,cpp}        解析 "Alt + R" 并 RegisterHotKey
-│  ├─ Settings.{h,cpp}      ALTRun.ini 读写（键名与旧版一致）
+│  ├─ Settings.{h,cpp}      ALTRun.ini 读写（键名与旧版一致；UTF-8 自动转 UTF-16）
+│  ├─ DesktopSpace.{h,cpp}  虚拟桌面归属检测（IVirtualDesktopManager）
 │  └─ ShellIntegration.{h,cpp}  SendTo 快捷方式、Popup.wav 提示音
 ├─ core/                    无 UI 依赖的可测试逻辑
 │  ├─ Encoding.{h,cpp}      GBK ⇄ UTF-8、UTF-8 严格校验
@@ -264,6 +265,8 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | D21 | 不内嵌默认 `BG.jpg`/`Popup.wav` 资源 | 重写版无资源段；缺失时静默回退纯色/不播放（原版会从资源释放） |
 | D22 | 本地化目前只覆盖主窗口文案与关于窗动态字段 | 设置/管理器/编辑/参数窗仍是中文硬编码；外部 224 键 `.lang` 可加载且缺键回退 |
 | D23 | 关于窗 420×360（原版约 420×320） | 为容纳 7 行信息 + 可滚动正文 |
+| D24 | 唤出前检测虚拟桌面，必要时**重建**主窗（`DesktopSpace` + `App::RecreateMainWindow`） | Windows 无法把窗口搬到别的虚拟桌面；原版是 VCL `Show` 同样受此限制（表现为"热键没反应"）。重建后热键与托盘迁移到新 hwnd，查询失败时 fail-open 不重建 |
+| D25 | `ALTRun.ini` 若为 UTF-8 则启动时原地转 UTF-16 | Windows profile API 只认 ANSI 或带 BOM 的 UTF-16；Win11 记事本默认存 UTF-8，会让中文 `Lang`/字体名全变乱码。老 ANSI/GBK 文件不动，写回后仍由 profile API 维护 UTF-16 格式 |
 
 ## 13. 构建、测试与打包
 

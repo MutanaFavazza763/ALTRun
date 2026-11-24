@@ -16,6 +16,7 @@ endif()
 set(ALTRUN_SOURCES
     src/main.cpp
     src/app/App.cpp
+    src/app/DesktopSpace.cpp
     src/app/Hotkey.cpp
     src/app/Settings.cpp
     src/app/ShellIntegration.cpp
@@ -44,6 +45,7 @@ set(ALTRUN_SOURCES
 
 set(ALTRUN_HEADERS
     src/app/App.h
+    src/app/DesktopSpace.h
     src/app/Hotkey.h
     src/app/Settings.h
     src/app/ShellIntegration.h

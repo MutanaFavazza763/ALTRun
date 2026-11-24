@@ -41,6 +41,16 @@ private:
 
     void AddTrayIcon();
     void RemoveTrayIcon();
+    // Registers/unregisters all three global hotkeys against the launcher
+    // window. They are tied to a window handle, so a rebuilt window needs them
+    // moved to the new one.
+    void RegisterHotkeys();
+    void UnregisterHotkeys();
+    // Windows cannot move windows between virtual desktops; when the launcher
+    // lives on a desktop the user is not looking at, replace it with a fresh
+    // window so the hotkey works from every virtual desktop.
+    void EnsureLauncherOnCurrentDesktop();
+    bool RecreateMainWindow();
     void ShowTrayMenu();
     void OnTrayCallback(LPARAM lparam);
     void ApplyAutoRun(bool enabled);
@@ -63,6 +73,11 @@ private:
     HotkeyRegistration hotkey_;
     HotkeyRegistration secondary_hotkey_;
     HotkeyRegistration last_item_hotkey_;
+    // Parsed once from Settings and reused whenever hotkeys are re-registered
+    // (settings change or window rebuild).
+    HotkeySpec toggle_spec_;
+    HotkeySpec secondary_spec_;
+    HotkeySpec last_item_spec_;
 
     NOTIFYICONDATAW tray_icon_ = {};
     bool tray_visible_ = false;

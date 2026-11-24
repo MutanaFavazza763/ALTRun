@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "app/DesktopSpace.h"
 #include "app/ShellIntegration.h"
 #include "core/Localization.h"
 #include "core/Logger.h"
@@ -115,21 +116,13 @@ int App::Run() {
             return HandleExternalMessage(hwnd, message, wparam, lparam);
         });
 
-    const HotkeySpec toggle = ParseHotkey(settings_.hotkey1);
-    if (!hotkey_.Register(main_window_.hwnd(), kHotkeyIdToggle, toggle)) {
-        Logger::Instance().Warn("cannot register hotkey " + settings_.hotkey1);
-    }
+    toggle_spec_ = ParseHotkey(settings_.hotkey1);
     // Secondary toggle hotkey (HotKey2); empty or identical values disable it.
     if (!settings_.hotkey2.empty() && settings_.hotkey2 != settings_.hotkey1) {
-        const HotkeySpec secondary = ParseHotkey(settings_.hotkey2);
-        if (secondary.valid()) {
-            secondary_hotkey_.Register(main_window_.hwnd(), kHotkeyIdToggle2, secondary);
-        }
+        secondary_spec_ = ParseHotkey(settings_.hotkey2);
     }
-    const HotkeySpec last_item = ParseHotkey(settings_.last_item_hotkey);
-    if (last_item.valid()) {
-        last_item_hotkey_.Register(main_window_.hwnd(), kHotkeyIdLastItem, last_item);
-    }
+    last_item_spec_ = ParseHotkey(settings_.last_item_hotkey);
+    RegisterHotkeys();
 
     // Settings dialog: the tray menu opens it; OK re-applies hotkeys and the
     // launcher window's appearance.
@@ -229,15 +222,18 @@ LRESULT App::HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam,
     switch (message) {
         case WM_HOTKEY:
             if (wparam == kHotkeyIdToggle || wparam == kHotkeyIdToggle2) {
+                EnsureLauncherOnCurrentDesktop();
                 main_window_.ToggleLauncher();
                 return 0;
             }
             if (wparam == kHotkeyIdLastItem) {
+                EnsureLauncherOnCurrentDesktop();
                 main_window_.LaunchLatest();
                 return 0;
             }
             return 0;
         case kShowMessage:
+            EnsureLauncherOnCurrentDesktop();
             main_window_.ShowLauncher();
             return 0;
         case kTrayCallbackMessage:
@@ -246,6 +242,7 @@ LRESULT App::HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam,
         case WM_COMMAND:
             switch (LOWORD(wparam)) {
                 case kTrayMenuShow:
+                    EnsureLauncherOnCurrentDesktop();
                     main_window_.ShowLauncher();
                     return 0;
                 case kTrayMenuManager:
@@ -288,6 +285,7 @@ void App::OnTrayCallback(LPARAM lparam) {
     switch (lparam) {
         case WM_LBUTTONUP:
         case WM_LBUTTONDBLCLK:
+            EnsureLauncherOnCurrentDesktop();
             main_window_.ToggleLauncher();
             break;
         case WM_RBUTTONUP:
@@ -345,28 +343,14 @@ void App::RemoveTrayIcon() {
 
 void App::ApplySettings() {
     // Hotkeys: re-register from the (already saved) settings.
-    hotkey_.Unregister();
-    secondary_hotkey_.Unregister();
-    last_item_hotkey_.Unregister();
-
-    const HotkeySpec toggle = ParseHotkey(settings_.hotkey1);
-    if (!toggle.valid() ||
-        !hotkey_.Register(main_window_.hwnd(), kHotkeyIdToggle, toggle)) {
-        Logger::Instance().Warn("cannot register hotkey " + settings_.hotkey1);
-    }
+    UnregisterHotkeys();
+    toggle_spec_ = ParseHotkey(settings_.hotkey1);
+    secondary_spec_ = {};
     if (!settings_.hotkey2.empty() && settings_.hotkey2 != settings_.hotkey1) {
-        const HotkeySpec secondary = ParseHotkey(settings_.hotkey2);
-        if (secondary.valid() &&
-            !secondary_hotkey_.Register(main_window_.hwnd(), kHotkeyIdToggle2,
-                                        secondary)) {
-            Logger::Instance().Warn("cannot register hotkey " + settings_.hotkey2);
-        }
+        secondary_spec_ = ParseHotkey(settings_.hotkey2);
     }
-    const HotkeySpec last_item = ParseHotkey(settings_.last_item_hotkey);
-    if (last_item.valid() &&
-        !last_item_hotkey_.Register(main_window_.hwnd(), kHotkeyIdLastItem, last_item)) {
-        Logger::Instance().Warn("cannot register hotkey " + settings_.last_item_hotkey);
-    }
+    last_item_spec_ = ParseHotkey(settings_.last_item_hotkey);
+    RegisterHotkeys();
 
     Logger::Instance().SetEnabled(settings_.trace_enabled);
     ApplyAutoRun(settings_.auto_run);
@@ -380,6 +364,66 @@ void App::ApplySettings() {
         about_window_.RefreshTexts();
     }
     Logger::Instance().Info("settings applied");
+}
+
+void App::RegisterHotkeys() {
+    if (main_window_.hwnd() == nullptr) {
+        return;
+    }
+    if (!hotkey_.Register(main_window_.hwnd(), kHotkeyIdToggle, toggle_spec_)) {
+        Logger::Instance().Warn("cannot register hotkey " + settings_.hotkey1);
+    }
+    if (secondary_spec_.valid() &&
+        !secondary_hotkey_.Register(main_window_.hwnd(), kHotkeyIdToggle2,
+                                    secondary_spec_)) {
+        Logger::Instance().Warn("cannot register hotkey " + settings_.hotkey2);
+    }
+    if (last_item_spec_.valid() &&
+        !last_item_hotkey_.Register(main_window_.hwnd(), kHotkeyIdLastItem,
+                                    last_item_spec_)) {
+        Logger::Instance().Warn("cannot register hotkey " + settings_.last_item_hotkey);
+    }
+}
+
+void App::UnregisterHotkeys() {
+    hotkey_.Unregister();
+    secondary_hotkey_.Unregister();
+    last_item_hotkey_.Unregister();
+}
+
+bool App::RecreateMainWindow() {
+    // Everything Windows anchors to a window handle has to move to the new one:
+    // the tray icon callback and all three RegisterHotKey registrations. Tray
+    // icon removal therefore happens before the old window disappears.
+    UnregisterHotkeys();
+    RemoveTrayIcon();
+
+    main_window_.Destroy();
+    if (!main_window_.CreateMain(instance_)) {
+        Logger::Instance().Error("cannot recreate main window");
+        return false;
+    }
+    main_window_.SetExitHandler([this]() { RequestExit(); });
+    main_window_.SetExternalHandler(
+        [this](HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
+            return HandleExternalMessage(hwnd, message, wparam, lparam);
+        });
+    RegisterHotkeys();
+    if (settings_.show_tray_icon) {
+        AddTrayIcon();
+    }
+    return true;
+}
+
+void App::EnsureLauncherOnCurrentDesktop() {
+    if (main_window_.hwnd() == nullptr) {
+        return;
+    }
+    if (IsWindowOnCurrentDesktop(main_window_.hwnd())) {
+        return;
+    }
+    Logger::Instance().Info("launcher is on another virtual desktop, recreating it");
+    RecreateMainWindow();
 }
 
 void App::ApplyAutoRun(bool enabled) {
