@@ -23,11 +23,13 @@ set(ALTRUN_SOURCES
     src/core/Launcher.cpp
     src/core/Logger.cpp
     src/core/Matcher.cpp
+    src/core/ParamHistory.cpp
     src/core/Shortcut.cpp
     src/core/ShortcutStore.cpp
     src/core/Text.cpp
     src/ui/D2DContext.cpp
     src/ui/MainWindow.cpp
+    src/ui/ParamWindow.cpp
     src/ui/Window.cpp
 )
 
@@ -40,11 +42,13 @@ set(ALTRUN_HEADERS
     src/core/Launcher.h
     src/core/Logger.h
     src/core/Matcher.h
+    src/core/ParamHistory.h
     src/core/Shortcut.h
     src/core/ShortcutStore.h
     src/core/Text.h
     src/ui/D2DContext.h
     src/ui/MainWindow.h
+    src/ui/ParamWindow.h
     src/ui/Window.h
 )
 

@@ -170,6 +170,28 @@ std::string ClipboardText() {
     return result;
 }
 
+bool HasParamPlaceholder(std::string_view command_line) {
+    return command_line.find("{%p}") != std::string_view::npos ||
+           command_line.find("%p") != std::string_view::npos;
+}
+
+bool NeedsParamPrompt(const Shortcut& item) {
+    if (item.param_type == ParamType::None) {
+        return false;
+    }
+    // {%c}/{%wd}/{%wt}/{%wc} provide their own value, so no prompt is needed.
+    const bool has_auto_value =
+        item.command_line.find("{%c}") != std::string::npos ||
+        item.command_line.find("{%wd}") != std::string::npos ||
+        item.command_line.find("{%wt}") != std::string::npos ||
+        item.command_line.find("{%wc}") != std::string::npos;
+    if (has_auto_value) {
+        return false;
+    }
+    // {%p}/%p need user input, and URL/UTF8 query types append the parameter.
+    return true;
+}
+
 LaunchPlan BuildLaunchPlan(const Shortcut& item, std::string_view param) {
     LaunchPlan plan;
 

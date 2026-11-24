@@ -138,6 +138,7 @@ void Settings::Load() {
 
     trace_enabled = ReadBool(ini, L"DEBUG", L"TraceEnable", false);
     shortcut_run_count = ReadInt(ini, L"DEBUG", L"ShortCutRunCount", 0);
+    latest_list = ReadString(ini, L"DEBUG", L"LatestList", latest_list);
 
     Logger::Instance().SetEnabled(trace_enabled);
     Logger::Instance().Info("settings: " + ToUtf8(ini_path));
@@ -185,6 +186,7 @@ bool Settings::Save() const {
 
     WriteBool(ini, L"DEBUG", L"TraceEnable", trace_enabled);
     WriteInt(ini, L"DEBUG", L"ShortCutRunCount", shortcut_run_count);
+    WriteStr(ini, L"DEBUG", L"LatestList", latest_list);
 
     return true;
 }

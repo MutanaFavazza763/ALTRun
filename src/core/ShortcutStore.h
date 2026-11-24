@@ -50,6 +50,13 @@ public:
         return favourites_;
     }
 
+    // Recent list (original [DEBUG] LatestList): a comma separated list of
+    // ShortCutList row indices, at most 10 entries, most recent first.
+    void SetLatestFromSpec(std::string_view spec);
+    std::string LatestIndexSpec() const;
+    void RecordLatest(size_t entry_index);
+    const std::vector<size_t>& latest() const { return latest_; }
+
     // Writes the built-in default list when ShortCutList.txt does not exist
     // (original behaviour: regenerated whenever the file is deleted).
     void SeedDefaultsIfMissing();
@@ -67,6 +74,7 @@ private:
 
     std::vector<ShortcutEntry> entries_;
     std::vector<std::pair<std::string, std::string>> favourites_;
+    std::vector<size_t> latest_;
     std::wstring list_path_;
     std::wstring favourite_path_;
 };

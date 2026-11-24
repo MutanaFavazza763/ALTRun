@@ -7,6 +7,10 @@
 
 ![启动器截图](docs/images/launcher.png)
 
+参数输入窗（带全局参数历史）：
+
+![参数窗截图](docs/images/param.png)
+
 ## 特性（已完成）
 
 - 全局热键唤出（默认 `Alt + R`，可配第二热键），单实例，托盘图标
@@ -16,7 +20,12 @@
 - 可配置结果行格式（`ListFormat`：`%-25s| %s`、`%s (%s)`、`%s [%s]`）
 - 执行：环境变量、`@`/`@+`/`@-` 显示前缀、参数占位符、`URL_Query`/`UTF8_Query` 编码、
   ShellExecute 失败自动降级 WinExec
-- **数据格式与旧版逐字节兼容**：`ShortCutList.txt`（GBK）、`FavoriteList.txt`、`ALTRun.ini`
+- 参数窗：需要参数的条目先弹窗输入，全局参数历史（次数排序、满额淘汰最早项），
+  Enter 确认 / Esc 两段式 / 空闲自动取消
+- 最近列表：`Ctrl+L` 查看、`ALT+L` 直接执行最近项（不增加 Freq）
+- `ExecuteIfOnlyOne`、输入末尾空格、`;`、`'` 等原版快捷执行方式
+- **数据格式与旧版逐字节兼容**：`ShortCutList.txt`（GBK）、`FavoriteList.txt`、
+  `ParamHistory.txt`、`ALTRun.ini`（含 `[DEBUG] LatestList`）
 - 绿色便携：所有配置与数据都在 exe 同目录，不写注册表配置
 - 中文界面与 IME 输入、Win11 圆角暗色窗口
 
@@ -58,8 +67,8 @@ resources/ 运行时资源（皮肤、语言、图标，M5 使用）
 
 ## 状态
 
-里程碑 M0（规格）与 M1（可运行骨架）完成；参数窗口、设置界面、快捷项管理、
-皮肤/多语言正在按 [ROADMAP.md](docs/ROADMAP.md) 推进。
+里程碑 M0（规格）、M1（可运行骨架）、M2（参数窗 / 参数历史 / 最近列表）完成；
+设置界面、快捷项管理、皮肤/多语言正在按 [ROADMAP.md](docs/ROADMAP.md) 推进。
 
 ## 许可
 

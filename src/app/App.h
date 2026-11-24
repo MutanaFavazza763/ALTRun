@@ -7,6 +7,7 @@
 
 #include "app/Hotkey.h"
 #include "app/Settings.h"
+#include "core/ParamHistory.h"
 #include "core/ShortcutStore.h"
 #include "ui/MainWindow.h"
 
@@ -48,6 +49,7 @@ private:
 
     Settings settings_;
     ShortcutStore store_;
+    ParamHistory param_history_;
     MainWindow main_window_;
     HotkeyRegistration hotkey_;
     HotkeyRegistration secondary_hotkey_;

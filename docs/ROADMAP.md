@@ -28,16 +28,20 @@
 验收：编译通过；`--show` 启动后可见 34 项默认列表；输入 `note` 命中 notepad 并回车启动；
 `ShortCutList.txt` 被旧版程序可读（GBK 格式一致）。
 
-## M2 — 参数与最近列表（⏳）
+## M2 — 参数与最近列表（✅）
 
-- [ ] `frmParam` 参数输入窗口（`ParamType != None` 且命令行无占位符时弹出）
-- [ ] `ParamHistory.txt` 参数历史（上限 `ParamHistoryLimit`，默认 50）
-- [ ] `{%p}` / `{%c}` / `{%wd}` / `{%wt}` / `{%wc}` 完整占位符行为
-- [ ] `LatestList`（最近执行 10 项）持久化到 ini，`LastItemHotKey` 执行最近项
-- [ ] `ExecuteIfOnlyOne`：唯一结果自动执行
-- [ ] 输入末尾空格 / 数字 / `;` / `'` 触发执行的原版语义
+- [x] `ParamWindow` 参数输入窗（顶部快捷项名、单行编辑、确定按钮、历史下拉）
+- [x] `ParamHistory.txt` 参数历史（`rank|param`，上限 `ParamHistoryLimit`，淘汰最早 rank）
+- [x] `{%p}` / `{%c}` / `{%wd}` / `{%wt}` / `{%wc}` 完整占位符行为（执行链已接入）
+- [x] `LatestList`（最近执行 10 项，行索引）持久化到 ini `[DEBUG]`
+- [x] `LastItemHotKey`（ALT+L）直接执行最近项，且不增加 Freq
+- [x] `Ctrl+L` 显示最近列表
+- [x] `ExecuteIfOnlyOne`：唯一结果自动执行
+- [x] 输入末尾空格 / `;` / `'` 触发执行的原版语义
+- [x] 参数窗 Esc 两段式、空闲 `HideDelay` 秒自动取消、`WM_CLOSE` 优雅退出并落盘
 
-验收：`cmd /k %p` 输入参数后正确执行；ALT+L 启动上一次执行的条目；参数历史可回选。
+验收：`cmd /k %p` 弹出参数窗，输入参数后执行；参数写入 `ParamHistory.txt` 并出现在下次历史中；
+ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 
 ## M3 — 设置界面（⏳）
 
@@ -70,7 +74,8 @@
 
 ## M6 — 质量与发布（⏳）
 
-- [ ] `Matcher` / `ShortcutStore` / `Formatter` 单元测试（含 GBK 中文用例、缺陷回归）
+- [ ] `Matcher` / `ShortcutStore` / `Formatter` / `ParamHistory` 单元测试
+      （含 GBK 中文用例、缺陷回归）
 - [ ] 与原版 `ShortCutList.txt` 真实样本的兼容性测试
 - [ ] Release 打包（zip：exe + res + 默认 ini + 默认列表）
 - [ ] 使用说明文档与截图

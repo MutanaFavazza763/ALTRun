@@ -56,7 +56,8 @@ bool HasShowFlag() {
 }  // namespace
 
 App::App(HINSTANCE instance)
-    : instance_(instance), main_window_(settings_, store_) {}
+    : instance_(instance),
+      main_window_(settings_, store_, param_history_) {}
 
 App::~App() {
     RemoveTrayIcon();
@@ -80,6 +81,10 @@ int App::Run() {
     // regenerates it).
     store_.Load();
     store_.SeedDefaultsIfMissing();
+    // Recent list and parameter history are stored outside ShortCutList.txt
+    // (ini LatestList / ParamHistory.txt), like the original.
+    store_.SetLatestFromSpec(settings_.latest_list);
+    param_history_.Load(settings_.param_history_limit);
 
     if (!main_window_.CreateMain(instance_)) {
         Logger::Instance().Error("cannot create main window");
@@ -123,8 +128,10 @@ int App::Run() {
     }
 
     Logger::Instance().Info("ALTRun shutting down");
+    settings_.latest_list = store_.LatestIndexSpec();
     settings_.Save();
     store_.Save();
+    param_history_.Save(settings_.param_history_limit);
     return static_cast<int>(message.wParam);
 }
 
@@ -171,9 +178,7 @@ LRESULT App::HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam,
                 return 0;
             }
             if (wparam == kHotkeyIdLastItem) {
-                main_window_.ShowLauncher();
-                // TODO: pre-select the last used item once the history model
-                // from docs/spec/03-shortcut-model.md is implemented.
+                main_window_.LaunchLatest();
                 return 0;
             }
             return 0;
@@ -190,7 +195,7 @@ LRESULT App::HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam,
                     return 0;
                 case kTrayMenuConfig:
                     ::MessageBoxW(hwnd,
-                                  L"设置窗口尚未实现（见 docs/ARCHITECTURE.md 里程碑 M3）",
+                                  L"设置窗口尚未实现（见 docs/ROADMAP.md 里程碑 M3）",
                                   L"ALTRun", MB_OK | MB_ICONINFORMATION);
                     return 0;
                 case kTrayMenuExit:
@@ -199,6 +204,11 @@ LRESULT App::HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam,
                 default:
                     break;
             }
+            return 0;
+        case WM_CLOSE:
+            // Closing the launcher window terminates the process (original
+            // actClose behaviour): flush ini, shortcut list and param history.
+            RequestExit();
             return 0;
         case WM_ENDSESSION:
             RequestExit();
@@ -254,7 +264,8 @@ void App::AddTrayIcon() {
                       L"ALTRun - Alt+R 打开");
     tray_visible_ = ::Shell_NotifyIconW(NIM_ADD, &tray_icon_) != FALSE;
     if (!tray_visible_) {
-        Logger::Instance().Warn("failed to add tray icon");
+        Logger::Instance().Warn("failed to add tray icon, error=" +
+                                std::to_string(::GetLastError()));
     }
 }
 

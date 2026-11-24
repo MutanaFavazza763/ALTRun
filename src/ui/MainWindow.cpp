@@ -11,6 +11,7 @@
 #include "core/Launcher.h"
 #include "core/Logger.h"
 #include "core/Text.h"
+#include "ui/ParamWindow.h"
 
 namespace alt {
 namespace {
@@ -33,6 +34,10 @@ constexpr UINT kTimerCaret = 1;
 constexpr UINT kTimerHide = 2;
 constexpr UINT kCaretBlinkMs = 530;
 
+// Posted to the window when ExecuteIfOnlyOne should run the single match;
+// posting avoids re-entrancy while the result list is being rebuilt.
+constexpr UINT kMessageAutoExecute = WM_APP + 20;
+
 const D2D1_COLOR_F kBackground = D2D1::ColorF(0.102f, 0.110f, 0.125f, 1.0f);
 const D2D1_COLOR_F kBorder = D2D1::ColorF(0.239f, 0.255f, 0.290f, 1.0f);
 const D2D1_COLOR_F kSelected = D2D1::ColorF(0.161f, 0.290f, 0.435f, 1.0f);
@@ -44,14 +49,25 @@ const D2D1_COLOR_F kCaret = D2D1::ColorF(0.361f, 0.659f, 0.988f, 1.0f);
 
 }  // namespace
 
-MainWindow::MainWindow(Settings& settings, ShortcutStore& store)
-    : settings_(settings), store_(store) {}
+MainWindow::MainWindow(Settings& settings, ShortcutStore& store,
+                       ParamHistory& param_history)
+    : settings_(settings), store_(store), param_history_(param_history) {}
 
 MainWindow::~MainWindow() = default;
 
 bool MainWindow::CreateMain(HINSTANCE instance) {
-    return Create(instance, L"ALTRun.MainWindow.v2", L"ALTRun", WS_POPUP,
-                  WS_EX_TOOLWINDOW | WS_EX_TOPMOST);
+    if (!Create(instance, L"ALTRun.MainWindow.v2", L"ALTRun", WS_POPUP,
+                WS_EX_TOOLWINDOW | WS_EX_TOPMOST)) {
+        return false;
+    }
+    // The parameter prompt is created lazily on first use but its class is
+    // registered here so the first Open() has no extra latency.
+    param_window_ = std::make_unique<ParamWindow>(settings_, param_history_);
+    if (!param_window_->CreateParamWindow(instance)) {
+        Logger::Instance().Warn("cannot create parameter window");
+        param_window_.reset();
+    }
+    return true;
 }
 
 void MainWindow::OnCreate() {
@@ -186,6 +202,12 @@ void MainWindow::ClearQuery() {
 }
 
 void MainWindow::RefreshMatches() {
+    // While the recent list is displayed (Ctrl+L) an empty query keeps it
+    // visible; typing re-enters normal filtering.
+    if (showing_recent_ && query_.empty()) {
+        return;
+    }
+    showing_recent_ = false;
     matches_.clear();
 
     if (query_.empty()) {
@@ -240,6 +262,42 @@ void MainWindow::RefreshMatches() {
     }
     Relayout();
     ::InvalidateRect(hwnd_, nullptr, FALSE);
+
+    // ExecuteIfOnlyOne: a single match runs immediately, without waiting for
+    // Enter (original behaviour, default off).
+    if (settings_.execute_if_only_one && matches_.size() == 1 && !query_.empty()) {
+        ::PostMessageW(hwnd_, kMessageAutoExecute, 0, 0);
+    }
+}
+
+void MainWindow::ShowRecentList() {
+    showing_recent_ = true;
+    matches_.clear();
+    const std::vector<ShortcutEntry>& entries = store_.entries();
+    for (const size_t index : store_.latest()) {
+        if (index >= entries.size() || entries[index].is_blank) {
+            continue;
+        }
+        MatchResult result;
+        result.entry_index = index;
+        result.score = 0;
+        matches_.push_back(result);
+    }
+    selected_ = 0;
+    hover_ = -1;
+    Relayout();
+    ::InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void MainWindow::LaunchLatest() {
+    if (store_.latest().empty()) {
+        Logger::Instance().Trace("no recent item to launch");
+        return;
+    }
+    const size_t entry_index = store_.latest().front();
+    HideLauncher();
+    // The original does not bump Freq for the "last item" hotkey.
+    LaunchEntry(entry_index, false);
 }
 
 void MainWindow::OnPaint() {
@@ -433,28 +491,46 @@ void MainWindow::LaunchRow(size_t row) {
     LaunchEntry(matches_[row].entry_index);
 }
 
-void MainWindow::LaunchEntry(size_t entry_index) {
+void MainWindow::LaunchEntry(size_t entry_index, bool count_freq) {
+    const std::vector<ShortcutEntry>& entries = store_.entries();
+    if (entry_index >= entries.size() || entries[entry_index].is_blank) {
+        return;
+    }
+    const Shortcut item = entries[entry_index].item;
+
+    if (NeedsParamPrompt(item) && param_window_) {
+        // Prompt first, then launch with the confirmed parameter.
+        param_window_->Open(item, [this, entry_index, count_freq](std::string param) {
+            ExecuteEntry(entry_index, std::move(param), count_freq);
+        });
+        return;
+    }
+    ExecuteEntry(entry_index, "", count_freq);
+}
+
+void MainWindow::ExecuteEntry(size_t entry_index, std::string param, bool count_freq) {
     std::vector<ShortcutEntry>& entries = store_.mutable_entries();
     if (entry_index >= entries.size() || entries[entry_index].is_blank) {
         return;
     }
     const Shortcut& item = entries[entry_index].item;
 
-    // TODO(M3): parameter window (frmParam) for items whose ParamType is not
-    // None and whose command line has no placeholder; until then an empty
-    // parameter is substituted.
-    const LaunchResult result = LaunchShortcut(item, "");
+    const LaunchResult result = LaunchShortcut(item, param);
     if (!result.ok) {
         ::MessageBeep(MB_ICONWARNING);
         return;
     }
 
-    store_.TouchEntry(entry_index);
+    if (count_freq) {
+        store_.TouchEntry(entry_index);
+    }
+    store_.RecordLatest(entry_index);
     store_.RememberFavourite(query_, item.DisplayName());
     store_.Save();
 
     HideLauncher();
     ClearQuery();
+    showing_recent_ = false;
 
     if (settings_.exit_when_execute && exit_handler_) {
         exit_handler_();
@@ -465,6 +541,7 @@ void MainWindow::AppendQuery(const std::wstring& text) {
     if (text.empty()) {
         return;
     }
+    showing_recent_ = false;
     query_ += ToUtf8(text);
     caret_visible_ = true;
     RefreshMatches();
@@ -474,6 +551,7 @@ void MainWindow::Backspace() {
     if (query_.empty()) {
         return;
     }
+    showing_recent_ = false;
     size_t index = query_.size() - 1;
     while (index > 0 && (static_cast<unsigned char>(query_[index]) & 0xC0) == 0x80) {
         --index;
@@ -543,6 +621,10 @@ void MainWindow::HandleKeyDown(WPARAM vk) {
         PasteFromClipboard();
         return;
     }
+    if (ctrl && vk == 'L') {
+        ShowRecentList();
+        return;
+    }
 
     // Number-key launch (original NumberKey option).
     if (settings_.number_key && vk >= '0' && vk <= '9' && !ctrl) {
@@ -561,6 +643,20 @@ void MainWindow::HandleKeyDown(WPARAM vk) {
 void MainWindow::HandleChar(WPARAM ch) {
     const wchar_t c = static_cast<wchar_t>(ch);
     if (c < 0x20 || c == 0x7F) {
+        return;
+    }
+    // Trailing space runs the current selection; ';' and '\'' run the 2nd and
+    // 3rd visible items (original key handling, spec 3.8).
+    if (c == L' ' && !query_.empty()) {
+        LaunchRow(static_cast<size_t>(selected_));
+        return;
+    }
+    if (c == L';') {
+        LaunchRow(1);
+        return;
+    }
+    if (c == L'\'') {
+        LaunchRow(2);
         return;
     }
     if (settings_.number_key && c >= L'0' && c <= L'9') {
@@ -635,6 +731,12 @@ LRESULT MainWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
                 ::InvalidateRect(hwnd_, nullptr, FALSE);
             } else if (wparam == kTimerHide) {
                 HideLauncher();
+            }
+            return 0;
+        case kMessageAutoExecute:
+            if (settings_.execute_if_only_one && matches_.size() == 1 &&
+                !query_.empty()) {
+                LaunchRow(0);
             }
             return 0;
         case WM_IME_STARTCOMPOSITION:

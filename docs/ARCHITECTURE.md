@@ -38,7 +38,8 @@ src/
 │  ├─ Encoding.{h,cpp}      GBK ⇄ UTF-8、UTF-8 严格校验
 │  ├─ Text.{h,cpp}          UTF-8 ⇄ UTF-16、ASCII 大小写折叠
 │  ├─ Shortcut.{h,cpp}      快捷项模型 + ParamType 映射
-│  ├─ ShortcutStore.{h,cpp} ShortCutList.txt / FavoriteList.txt 读写与 CRUD
+│  ├─ ShortcutStore.{h,cpp} ShortCutList.txt / FavoriteList.txt / LatestList
+│  ├─ ParamHistory.{h,cpp}  ParamHistory.txt 参数历史（rank 淘汰算法）
 │  ├─ Matcher.{h,cpp}       正则/通配匹配、打分、Sort() 排序键
 │  ├─ Formatter.{h,cpp}     ListFormat 格式化、数字前缀、显示宽度
 │  ├─ Launcher.{h,cpp}      命令行解析、占位符替换、ShellExecute/WinExec
@@ -46,7 +47,8 @@ src/
 └─ ui/
    ├─ Window.{h,cpp}        无边框窗口基类 + 消息分发
    ├─ D2DContext.{h,cpp}    D2D/DWrite 资源封装（设备丢失重建）
-   └─ MainWindow.{h,cpp}    启动器窗口：输入、结果列表、绘制、键盘/IME
+   ├─ MainWindow.{h,cpp}    启动器窗口：输入、结果列表、绘制、键盘/IME
+   └─ ParamWindow.{h,cpp}   参数提示窗：单行编辑 + 历史下拉 + 空闲取消
 ```
 
 依赖方向严格单向：`ui → app → core`，`core` 不包含 `<windows.h>` 之外的 UI 头文件，
@@ -85,9 +87,15 @@ Freq   ParamType  Keyword  Name   CommandLine
 - 编码探测：BOM → UTF-8/UTF-16；否则严格 UTF-8 校验成功则按 UTF-8；否则按 GBK 解码。
 - `FavoriteList.txt`：`关键字小写|Name`，每行一条，按 30 字节宽度补空格。
 
+`ParamHistory.txt`：`rank|参数`，每行一条，最多 `ParamHistoryLimit`（默认 50）条。
+淘汰规则与原文一致：满额时从尾部向前找 rank 最小项删除；已存在项 rank+1；
+新项插到第 0 位、rank=0。原版格式串 `'%-10d|%-30s%'` 末尾多了一个孤立 `%`，
+很可能导致 `EConvertError` 从而历史从未保存成功（规格 §3.6）；重写改为纯
+`rank|param`，读取时容忍旧文件的末尾 `%` 与空白（差异 D10）。
+
 `ALTRun.ini`：`<exe目录>\ALTRun.ini`，键名与旧版完全一致（`HotKey1`、`HideDelay`…），
 由 `GetPrivateProfileStringW`/`WritePrivateProfileStringW` 读写，因此保持 ANSI 编码
-与 `0/1` 布尔约定。
+与 `0/1` 布尔约定。`[DEBUG] LatestList` 保存最近列表的**行索引**逗号串（最多 10 项）。
 
 ## 5. 匹配与排序（复刻原公式）
 
@@ -124,7 +132,34 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 7. 执行：`ShellExecuteExW`（`open`），失败时降级 `WinExec`（与原版一致），
    均失败才提示并计入日志。
 
-## 7. 窗口与交互
+## 7. 参数提示、最近列表与快捷执行
+
+**参数提示（原 `frmParam.pas`）**：`Launcher::NeedsParamPrompt` 判定——`ParamType != None`
+且命令行不含 `{%c}`/`{%wd}`/`{%wt}`/`{%wc}` 这几个自带取值的占位符时，先弹出
+`ParamWindow`：
+
+- 顶部是快捷项名称，单行编辑框（原生 EDIT，支持 IME/剪贴板），右侧"确定"按钮；
+- 下方列出全局参数历史（最多 6 行，显示 `次数x` 与参数文本），`↑/↓` 选择或鼠标点击填入；
+- `Enter` 确认并执行，`Esc` 两段式（非空先清空、空再取消），空闲 `HideDelay` 秒自动取消；
+- 确认后参数写入 `ParamHistory.txt`，随后按 `ParamType` 编码并替换 `{%p}`/`%p`
+  （`URL_Query`/`UTF8_Query` 追加编码结果）。
+
+**最近列表（`[DEBUG] LatestList`）**：最近执行的 10 个条目以**行索引**形式持久化。
+`Ctrl+L` 在列表区显示最近列表（不过滤，仅展示，可数字键执行）；`LastItemHotKey`
+（默认 `ALT+L`）直接执行最近一次条目，且**不增加**该条目的 Freq（与原版一致）。
+非搜索路径执行（最近项热键）同样计入最近列表，但不写收藏。
+
+**快捷执行键**（原版 key handling）：
+
+| 输入 | 行为 |
+|---|---|
+| 末尾空格 | 执行当前选中项 |
+| `1`–`9`、`0` | 执行对应编号项（`NumberKey`，`IndexFrom0to9` 决定编号基准） |
+| `;` | 执行显示编号 2 的项 |
+| `'` | 执行显示编号 3 的项 |
+| `ExecuteIfOnlyOne=True` 且仅 1 条结果 | 立即执行（通过 `WM_APP+20` 延迟投递避免重入） |
+
+## 8. 窗口与交互
 
 - 无边框 `WS_POPUP` + `WS_EX_TOOLWINDOW | WS_EX_TOPMOST`；`DwmSetWindowAttribute`
   开启 Win11 圆角与深色模式；`Alpha<255` 时用 `WS_EX_LAYERED` + `SetLayeredWindowAttributes`。
@@ -139,7 +174,7 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 - 全局热键：`HotKey1`（默认 `Alt + R`）、`HotKey2`（默认 `Pause`，空则禁用）、
   `LastItemHotKey`（默认 `ALT+L`，当前仅唤起窗口，执行"最近项"待 M2）。
 
-## 8. 与原文的刻意差异
+## 9. 与原文的刻意差异
 
 | 编号 | 差异 | 原因 |
 |---|---|---|
@@ -152,8 +187,11 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | D7 | 写文件为临时文件 + 原子替换，并保留 `.bak` | 原版非原子写，崩溃会丢列表 |
 | D8 | 日志除 `%LOCALAPPDATA%` 外回退到 exe 目录 | 便携/受限环境（沙箱、受限用户）也能记录 |
 | D9 | 界面用 D2D 自绘替代 VCL 皮肤引擎 | 现代渲染、无第三方皮肤库；皮肤图/字体解析在 M5 实现 |
+| D10 | `ParamHistory.txt` 写 `rank\|param`，读取容忍旧格式的末尾 `%` | 原版格式串 `'%-10d\|%-30s%'` 的孤立 `%` 很可能让保存永远抛异常（规格 U2），直接照抄会让参数历史失效 |
+| D11 | 最近项热键走 `WM_HOTKEY` 直接执行，参数项先弹参数窗 | 原版同样先取参数再执行；这里把"唤起窗口"改为"直接执行"，符合热键语义 |
+| D12 | `ExecuteIfOnlyOne` 用 `WM_APP+20` 延迟投递执行 | 在结果列表重建过程中同步执行会重入 `RefreshMatches`/`HideLauncher` |
 
-## 9. 构建与运行
+## 10. 构建与运行
 
 ```powershell
 # 需要 Visual Studio（含 MSVC + Windows SDK）与 CMake ≥ 3.28
@@ -170,7 +208,7 @@ cmake --build build/vs --config Release
 运行后在 exe 目录生成：`ALTRun.ini`、`ShortCutList.txt`（+`.bak`）、
 `FavoriteList.txt`、`altRun.log`。
 
-## 10. 尚未实现（见 [ROADMAP.md](ROADMAP.md)）
+## 11. 尚未实现（见 [ROADMAP.md](ROADMAP.md)）
 
-参数窗口与参数历史、设置界面（5 个 Tab）、快捷项管理/编辑/导入导出、
-皮肤背景与字体解析、语言文件、`AddToSendTo`、`LatestList` 最近项执行、单元测试与打包。
+设置界面（5 个 Tab / 50 键）、快捷项管理/编辑/导入导出、皮肤背景与字体解析、
+语言文件、`AddToSendTo`、单实例唤醒时复用已运行实例的窗口、单元测试与打包。

@@ -6,16 +6,20 @@
 #include <wrl/client.h>
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "app/Settings.h"
 #include "core/Matcher.h"
+#include "core/ParamHistory.h"
 #include "core/ShortcutStore.h"
 #include "ui/D2DContext.h"
 #include "ui/Window.h"
 
 namespace alt {
+
+class ParamWindow;
 
 // The launcher window: borderless, topmost, centered on the cursor's monitor.
 //
@@ -25,7 +29,7 @@ namespace alt {
 //   * ListFormat based row text plus the numeric/parameter prefixes
 class MainWindow : public Window {
 public:
-    MainWindow(Settings& settings, ShortcutStore& store);
+    MainWindow(Settings& settings, ShortcutStore& store, ParamHistory& param_history);
     ~MainWindow() override;
 
     bool CreateMain(HINSTANCE instance);
@@ -36,6 +40,9 @@ public:
 
     // Recomputes |matches_| from the current query.
     void RefreshMatches();
+
+    // Executes the most recently used item (LastItemHotKey, default ALT+L).
+    void LaunchLatest();
 
     void SetExitHandler(std::function<void()> handler);
 
@@ -62,7 +69,12 @@ private:
     std::string FormatRow(size_t row) const;
     std::string NumberPrefixFor(size_t row, const ShortcutEntry& entry) const;
     void LaunchRow(size_t row);
-    void LaunchEntry(size_t entry_index);
+    // Prompts for a parameter when needed, then executes.
+    void LaunchEntry(size_t entry_index, bool count_freq = true);
+    // Performs the actual launch (no prompt).
+    void ExecuteEntry(size_t entry_index, std::string param, bool count_freq);
+    // Ctrl+L: show the recent list without filtering.
+    void ShowRecentList();
     void MoveSelection(int delta);
     void AppendQuery(const std::wstring& text);
     void Backspace();
@@ -82,6 +94,7 @@ private:
 
     Settings& settings_;
     ShortcutStore& store_;
+    ParamHistory& param_history_;
 
     D2DContext d2d_;
     ComPtr<IDWriteTextFormat> title_format_;
@@ -99,7 +112,11 @@ private:
     std::wstring ime_composition_;
     bool caret_visible_ = true;
     bool dragging_ = false;
+    // True while the recent list (Ctrl+L) is displayed instead of matches.
+    bool showing_recent_ = false;
     POINT drag_origin_ = {};
+
+    std::unique_ptr<ParamWindow> param_window_;
 
     std::function<void()> exit_handler_;
 };

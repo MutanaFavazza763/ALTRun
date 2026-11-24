@@ -55,6 +55,8 @@ struct Settings {
     // [DEBUG]
     bool trace_enabled = false;           // TraceEnable
     int shortcut_run_count = 0;           // ShortCutRunCount
+    // LatestList: comma separated ShortCutList row indices (max 10).
+    std::string latest_list;              // LatestList
 
     // Resolved at runtime, not persisted.
     std::wstring ini_path;

@@ -44,4 +44,12 @@ std::string EncodeParam(ParamType type, std::string_view param);
 // Text currently on the clipboard (empty when unavailable), used by {%c}.
 std::string ClipboardText();
 
+// True when executing |item| must ask the user for a parameter first: the
+// ParamType is not None and the command line does not already obtain its value
+// from the clipboard or the foreground window ({%c}/{%wd}/{%wt}/{%wc}).
+bool NeedsParamPrompt(const Shortcut& item);
+
+// True when |command_line| contains one of the parameter placeholders.
+bool HasParamPlaceholder(std::string_view command_line);
+
 }  // namespace alt

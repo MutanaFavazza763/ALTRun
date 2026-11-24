@@ -444,6 +444,68 @@ std::string ShortcutStore::FindFavourite(std::string_view keyword) const {
     return {};
 }
 
+namespace {
+std::string TrimSpaces(std::string_view text) {
+    size_t begin = 0;
+    size_t end = text.size();
+    while (begin < end && (text[begin] == ' ' || text[begin] == '\t')) ++begin;
+    while (end > begin && (text[end - 1] == ' ' || text[end - 1] == '\t')) --end;
+    return std::string(text.substr(begin, end - begin));
+}
+}  // namespace
+
+void ShortcutStore::SetLatestFromSpec(std::string_view spec) {
+    latest_.clear();
+    size_t start = 0;
+    while (start <= spec.size()) {
+        const size_t comma = spec.find(',', start);
+        const std::string piece =
+            TrimSpaces(spec.substr(start, comma == std::string_view::npos
+                                             ? std::string_view::npos
+                                             : comma - start));
+        if (!piece.empty()) {
+            const long long index = std::atoll(piece.c_str());
+            if (index >= 0 && index < static_cast<long long>(entries_.size())) {
+                const size_t value = static_cast<size_t>(index);
+                const bool duplicate =
+                    std::find(latest_.begin(), latest_.end(), value) != latest_.end();
+                if (!duplicate && latest_.size() < 10) {
+                    latest_.push_back(value);
+                }
+            }
+        }
+        if (comma == std::string_view::npos) {
+            break;
+        }
+        start = comma + 1;
+    }
+}
+
+std::string ShortcutStore::LatestIndexSpec() const {
+    std::string spec;
+    for (size_t i = 0; i < latest_.size(); ++i) {
+        if (i != 0) {
+            spec.push_back(',');
+        }
+        spec += std::to_string(latest_[i]);
+    }
+    return spec;
+}
+
+void ShortcutStore::RecordLatest(size_t entry_index) {
+    if (entry_index >= entries_.size()) {
+        return;
+    }
+    auto it = std::find(latest_.begin(), latest_.end(), entry_index);
+    if (it != latest_.end()) {
+        latest_.erase(it);
+    }
+    latest_.insert(latest_.begin(), entry_index);
+    if (latest_.size() > 10) {
+        latest_.resize(10);
+    }
+}
+
 void ShortcutStore::SeedDefaultsIfMissing() {
     if (::GetFileAttributesW(list_path_.c_str()) != INVALID_FILE_ATTRIBUTES) {
         return;
