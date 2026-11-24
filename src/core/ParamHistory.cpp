@@ -75,6 +75,8 @@ ParamHistory::ParamHistory() {
     path_ = ShortcutStore::ExeDirectory() + ToWide(kParamHistoryFile);
 }
 
+ParamHistory::ParamHistory(std::wstring path) : path_(std::move(path)) {}
+
 bool ParamHistory::Load(int limit) {
     items_.clear();
     std::string bytes;
@@ -98,10 +100,9 @@ bool ParamHistory::Load(int limit) {
         if (bar != std::string::npos) {
             const std::string rank_text = TrimDelphi(line.substr(0, bar));
             std::string text = TrimDelphi(line.substr(bar + 1));
-            // Tolerate the stray trailing '%' written by the original.
-            while (!text.empty() && (text.back() == '%' || text.back() == ' ')) {
-                text.pop_back();
-            }
+            // A trailing '%' may be valid user input (100%, %PATH%).
+            // The legacy writer's behaviour is uncertain; never guess and
+            // destructively strip characters from persisted parameters.
             if (!text.empty()) {
                 ParamHistoryItem item;
                 item.rank = std::atoi(rank_text.c_str());

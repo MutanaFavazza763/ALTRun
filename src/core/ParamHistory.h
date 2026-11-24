@@ -19,12 +19,13 @@ struct ParamHistoryItem {
 //   * an existing item gets rank + 1 (it is NOT moved to the front)
 //
 // File: <exe目录>\ParamHistory.txt, ANSI/GBK, one "rank|text" per line.
-// The original wrote Format('%-10d|%-30s%%') which appended a stray '%';
-// this implementation writes plain "rank|text" and tolerates junk on read
-// (documented deviation D10 in docs/ARCHITECTURE.md).
+// Writes plain "rank|text". The legacy writer's trailing '%' behaviour is
+// uncertain; preserve literal percent signs rather than guessing at repairs.
 class ParamHistory {
 public:
     ParamHistory();
+    // Explicit path for isolated tests and profile import.
+    explicit ParamHistory(std::wstring path);
 
     bool Load(int limit);
     bool Save(int limit) const;

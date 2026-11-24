@@ -315,6 +315,25 @@ void TestParamHistory() {
     CHECK_INT(static_cast<long long>(history.items().size()), 2);
     CHECK_STR(history.items()[0].text, "gamma");
     CHECK_STR(history.items()[1].text, "alpha");
+
+    const std::wstring path = alt::ShortcutStore::ExeDirectory() +
+        L"param-regression-" + std::to_wstring(::GetCurrentProcessId()) + L".txt";
+    // Own this unique fixture only; never overwrite a user's history file.
+    CHECK(::GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES);
+    alt::ParamHistory saved(path);
+    saved.Record("100%", 50);
+    saved.Record("%PATH%", 50);
+    saved.Record("a|b%", 50);
+    CHECK(saved.Save(50));
+    alt::ParamHistory loaded(path);
+    CHECK(loaded.Load(50));
+    CHECK_INT(loaded.items().size(), 3);
+    if (loaded.items().size() == 3) {
+        CHECK_STR(loaded.items()[0].text, "a|b%");
+        CHECK_STR(loaded.items()[1].text, "%PATH%");
+        CHECK_STR(loaded.items()[2].text, "100%");
+    }
+    CHECK(::DeleteFileW(path.c_str()) != FALSE);
 }
 
 // ---------------------------------------------------------------------------
