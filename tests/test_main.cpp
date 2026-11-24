@@ -131,6 +131,27 @@ void TestFormatter() {
     // Unknown conversion is preserved literally.
     CHECK_STR(alt::FormatListLine("%d", "x", "y"), "%d");
 
+    // The launcher draws two pixel columns for the "|"-separator forms ...
+    const alt::ListLineParts parts =
+        alt::FormatListParts("%-25s| %s", "note", "记事本");
+    CHECK(parts.two_columns);
+    CHECK(parts.left.find("note") == 0);
+    CHECK_STR(parts.separator, "| ");
+    CHECK_STR(parts.right, "记事本");
+
+    // ... but formats that put the name inline stay a single string.
+    const alt::ListLineParts parens =
+        alt::FormatListParts("%s (%s)", "note", "记事本");
+    CHECK(!parens.two_columns);
+    CHECK_STR(parens.left, "note (记事本)");
+    CHECK(parens.right.empty());
+
+    // Text after the second placeholder belongs to the right column.
+    const alt::ListLineParts suffix =
+        alt::FormatListParts("%-8s | %s!", "note", "name");
+    CHECK(suffix.two_columns);
+    CHECK_STR(suffix.right, "name!");
+
     // Number prefixes: 1..9,0 by default; * marks parameter items.
     CHECK_STR(alt::NumberPrefix(0, false, false), " 1|");
     CHECK_STR(alt::NumberPrefix(1, true, false), "*2|");

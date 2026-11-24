@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(ALTRun
-    VERSION 2.0.3
+    VERSION 2.0.4
     DESCRIPTION "ALTRun - an alternative Run. Fast launcher for Windows."
     LANGUAGES CXX)
 
@@ -41,6 +41,7 @@ set(ALTRUN_SOURCES
     src/ui/ShortcutManagerWindow.cpp
     src/ui/SkinImage.cpp
     src/ui/Window.cpp
+    src/ui/WelcomeWindow.cpp
 )
 
 set(ALTRUN_HEADERS
@@ -72,6 +73,7 @@ set(ALTRUN_HEADERS
     src/ui/SkinImage.h
     src/ui/UiText.h
     src/ui/Window.h
+    src/ui/WelcomeWindow.h
 )
 
 add_executable(ALTRun WIN32 ${ALTRUN_SOURCES} ${ALTRUN_HEADERS})

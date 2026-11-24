@@ -169,13 +169,23 @@ void Settings::Load() {
     // Portable layout first: <exe目录>\ALTRun.ini (original behaviour).
     const std::wstring portable = ExeDirectory() + L"ALTRun.ini";
     ini_path = portable;
-    if (::GetFileAttributesW(portable.c_str()) == INVALID_FILE_ATTRIBUTES) {
+    bool ini_exists =
+        ::GetFileAttributesW(portable.c_str()) != INVALID_FILE_ATTRIBUTES;
+    if (!ini_exists) {
         const std::wstring roaming = AppDataIniPath();
         if (!roaming.empty() &&
             ::GetFileAttributesW(roaming.c_str()) != INVALID_FILE_ATTRIBUTES) {
             ini_path = roaming;
+            ini_exists = true;
             Logger::Instance().Info("using roaming ALTRun.ini");
         }
+    }
+    first_run = !ini_exists;
+    if (first_run) {
+        // The original picks the UI language from the system on first launch;
+        // without this a Chinese Windows would start in English.
+        lang = Localization::SystemDefaultLanguage();
+        Logger::Instance().Info("settings: first run, language=" + lang);
     }
 
     const std::wstring& ini = ini_path;

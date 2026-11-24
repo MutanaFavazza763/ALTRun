@@ -112,7 +112,7 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
       关键字推导、目录名不截断、缺失 .lnk）、FontSpec、Localization（295 键 × 三语言全覆盖）
 - [x] 编码兼容验证：读取 GBK 编码的 `ShortCutList.txt`（日志 `decoded as ANSI/GBK`）、
       修复尾部 CRLF 导致空行累积的缺陷
-- [x] Release 便携打包：`scripts/package.ps1`（自动找 CMake → 构建 → 暂存 exe/res/文档/样例 ini
+- [x] Release 便携打包：`scripts/package.ps1`（自动找 CMake → 构建 → 暂存 exe/res/文档/`ALTRun.ini.sample`
       → `dist/ALTRun-<版本>-win64.zip`），已实测 0.21 MB 包在干净目录运行并生成数据文件
 - [x] 使用说明 [USAGE.md](USAGE.md) 与 10 张界面截图（启动器/皮肤/多语言/参数/设置/管理器/关于）
 - [ ] CI（GitHub Actions）：本地已有 `ctest`/打包一键命令，CI 待后续接入
@@ -147,6 +147,23 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 验收：三种语言日志分别为 `using built-in zh_cn/zh_hk/en_us strings`；
 默认列表名依次为 `我的电脑` / `我的電腦` / `My Computer`，GBK 落盘无丢字。
 证据：`07-evidence/three-locales/`。
+
+## M9 — 列表对齐与首次启动向导（✅，2.0.4）
+
+- [x] 结果列表改为像素列：`FormatListParts()` 拆出前缀/关键字、分隔符、名称，
+      列宽由可见行最宽者决定并限制在 58%，`%s (%s)` 等非 `|` 格式仍整行绘制
+- [x] 过长关键字/名称用 `IDWriteTextLayout` 的 character trimming 画省略号，
+      不再被窗口右边界硬切
+- [x] 首次启动（无 ini）弹欢迎向导：语言（简/繁/英）、随 Windows 启动、
+      添加到发送到菜单，外加四条基本用法
+- [x] 首次默认语言取系统 UI 语言；默认快捷项名在向导确认后才生成，
+      避免英文界面配中文默认名
+- [x] `--welcome` 开发标志可强制打开向导，便于检查三种语言排版
+- [x] 测试：300 键 × 3 语言 + 两列/整行拆分样例，断言数 1024 → **1048**
+
+验收：12pt 与 14pt 比例字体下列表第二列对齐；长名称显示省略号；
+空目录首启看到中文向导，选 English 后默认列表名为 `My Computer`。
+证据：`07-evidence/first-run/`。
 
 ## 后续可选增强（⏳）
 

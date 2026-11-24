@@ -297,4 +297,9 @@ const char* const kLocalizationKeys[] = {
     "resNeedCommandLine",
     "resTestFailed",
     "resTestErrorCode",
+    "resWelcomeTitle",
+    "resWelcomeLanguage",
+    "resWelcomeAutoRun",
+    "resWelcomeSendTo",
+    "resWelcomeStart",
 };

@@ -200,6 +200,38 @@ constexpr BuiltinText kRewriteBuiltins[] = {
     {"resTestFailed", L"Cannot run this command line:\r\n",
      L"无法执行该命令行：\r\n"},
     {"resTestErrorCode", L"\r\nError code: ", L"\r\n错误码："},
+    // First-run welcome window (original: language picker + AutoRun/SendTo
+    // questions, plus the "use the hotkey" hint; the rewrite adds a short
+    // usage guide because the legacy dialogs never explained the list).
+    {"resWelcomeTitle", L"Welcome to ALTRun", L"欢迎使用 ALTRun",
+     L"歡迎使用 ALTRun"},
+    {"resWelcomeIntro",
+     L"Two quick choices, then the basics of using the launcher.",
+     L"先做两个选择，再看一眼基本用法。",
+     L"先做兩個選擇，再看一眼基本用法。"},
+    {"resWelcomeGuide",
+     L"Press %s to show or hide the launcher.\r\n"
+     L"Type a keyword and press Enter to run the selected shortcut.\r\n"
+     L"Items marked * need a parameter; enter it in the small prompt.\r\n"
+     L"Right-click the tray icon for Settings, Shortcut Manager and Exit.",
+     L"按 %s 随时呼出或隐藏启动器。\r\n"
+     L"输入关键字后按 Enter 运行选中的快捷项。\r\n"
+     L"带 * 的条目需要参数，在小窗口输入后按 Enter。\r\n"
+     L"右键托盘图标可打开设置、快捷项管理和退出。",
+     L"按 %s 隨時呼出或隱藏啟動器。\r\n"
+     L"輸入關鍵字後按 Enter 執行選取的捷徑。\r\n"
+     L"帶 * 的項目需要參數，在小視窗輸入後按 Enter。\r\n"
+     L"右鍵點擊系統匣圖示可開啟設定、捷徑管理與結束。"},
+    {"resWelcomeLanguage", L"Language", L"界面语言", L"介面語言"},
+    {"resWelcomeAutoRun", L"Start ALTRun with Windows", L"随 Windows 启动",
+     L"隨 Windows 啟動"},
+    {"resWelcomeSendTo", L"Add ALTRun to the Send To menu",
+     L"添加到“发送到”菜单", L"加入「傳送到」功能表"},
+    {"resWelcomeNote",
+     L"You can change the language and both options later in Settings.",
+     L"语言和这两个选项以后都能在“设置”里修改。",
+     L"語言與這兩個選項之後都能在「設定」中修改。"},
+    {"resWelcomeStart", L"Start using ALTRun", L"开始使用", L"開始使用"},
 };
 
 // All 224 keys of the legacy language files (8 sections, en_us / zh_cn / zh_hk).
@@ -251,6 +283,21 @@ std::string Localization::NormalizeLanguage(const std::string& lang) {
         lang.find("简体") != std::string::npos ||
         lang.find("簡體") != std::string::npos) {
         return "zh_cn";
+    }
+    return "en_us";
+}
+
+std::string Localization::SystemDefaultLanguage() {
+    const LANGID id = ::GetUserDefaultUILanguage();
+    if (PRIMARYLANGID(id) == LANG_CHINESE) {
+        switch (SUBLANGID(id)) {
+            case SUBLANG_CHINESE_TRADITIONAL:
+            case SUBLANG_CHINESE_HONGKONG:
+            case SUBLANG_CHINESE_MACAU:
+                return "zh_hk";
+            default:
+                return "zh_cn";
+        }
     }
     return "en_us";
 }

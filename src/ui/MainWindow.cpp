@@ -529,6 +529,48 @@ void MainWindow::DrawFrame() {
 
 void MainWindow::DrawRows() {
     const size_t rows = VisibleRows();
+    if (rows == 0) {
+        const D2D1_RECT_F rect = RowRect(0);
+        d2d_.DrawTextEllipsis(Loc("resNoMatch"), row_format_.Get(),
+                              D2D1::RectF(rect.left + 10.0f, rect.top, rect.right - 8.0f,
+                                          rect.bottom),
+                              kTextDim);
+        return;
+    }
+
+    // The list format uses space padding (%-25s) which only lines up with a
+    // fixed-advance font.  Draw the two fields in separate pixel columns
+    // instead: the widest "prefix + keyword" decides the split, so proportional
+    // fonts such as Segoe UI line up exactly and never overlap the name column.
+    struct RowView {
+        std::wstring left;
+        std::wstring right;
+    };
+    std::vector<RowView> views(rows);
+    float widest_left = 0.0f;
+    for (size_t row = 0; row < rows; ++row) {
+        const ShortcutEntry& entry = store_.entries()[matches_[row].entry_index];
+        const std::string prefix = NumberPrefixFor(row, entry);
+        const ListLineParts parts = FormatListParts(
+            settings_.list_format, entry.item.keyword, entry.item.DisplayName());
+        RowView& view = views[row];
+        if (parts.two_columns) {
+            view.left = ToWide(prefix + parts.left);
+            view.right = ToWide(parts.separator + parts.right);
+        } else {
+            view.left = ToWide(prefix + parts.left);
+        }
+        widest_left =
+            std::max(widest_left, MeasureWidth(view.left, mono_format_.Get()));
+    }
+
+    const D2D1_RECT_F first_row = RowRect(0);
+    const float left_x = first_row.left + 10.0f;
+    const float right_edge = first_row.right - 8.0f;
+    const float available = std::max(80.0f, right_edge - left_x);
+    const float column =
+        std::clamp(widest_left + 12.0f, 96.0f, available * 0.58f);
+
     for (size_t row = 0; row < rows; ++row) {
         const D2D1_RECT_F rect = RowRect(row);
         const bool is_selected = static_cast<int>(row) == selected_;
@@ -538,26 +580,23 @@ void MainWindow::DrawRows() {
             const float radius = std::max(
                 0.0f, static_cast<float>(settings_.round_border_radius) - 6.0f);
             d2d_.FillRoundedRect(
-                D2D1::RectF(rect.left, rect.top + 1.0f, rect.right, rect.bottom - 1.0f),
+                D2D1::RectF(rect.left, rect.top + 2.0f, rect.right, rect.bottom - 2.0f),
                 radius, kSelected);
         } else if (is_hover) {
             d2d_.FillRoundedRect(rect, 6.0f, kHover);
         }
 
-        const std::string line = FormatRow(row);
-        const std::wstring wide = ToWide(line);
-        d2d_.DrawTextBlock(wide, mono_format_.Get(),
-                           D2D1::RectF(rect.left + 10.0f, rect.top, rect.right - 8.0f,
-                                       rect.bottom),
-                           kTextBright);
-    }
-
-    if (rows == 0) {
-        const D2D1_RECT_F rect = RowRect(0);
-        d2d_.DrawTextBlock(Loc("resNoMatch"), row_format_.Get(),
-                           D2D1::RectF(rect.left + 10.0f, rect.top, rect.right,
-                                       rect.bottom),
-                           kTextDim);
+        const RowView& view = views[row];
+        d2d_.DrawTextEllipsis(
+            view.left, mono_format_.Get(),
+            D2D1::RectF(left_x, rect.top, left_x + column - 6.0f, rect.bottom),
+            kTextBright);
+        if (!view.right.empty()) {
+            d2d_.DrawTextEllipsis(
+                view.right, mono_format_.Get(),
+                D2D1::RectF(left_x + column, rect.top, right_edge, rect.bottom),
+                kTextBright);
+        }
     }
 }
 
@@ -572,11 +611,11 @@ void MainWindow::DrawFooter() {
         const ShortcutEntry& entry = store_.entries()[matches_[selected_].entry_index];
         const std::wstring detail =
             ToWide(entry.item.DisplayName() + "  " + entry.item.command_line);
-        d2d_.DrawTextBlock(detail, hint_format_.Get(),
-                           D2D1::RectF(kPad + 4.0f, detail_top,
-                                       static_cast<float>(settings_.form_width) - kPad,
-                                       detail_top + kDetailHeight),
-                           kTextDim);
+        d2d_.DrawTextEllipsis(detail, hint_format_.Get(),
+                              D2D1::RectF(kPad + 4.0f, detail_top,
+                                          static_cast<float>(settings_.form_width) - kPad,
+                                          detail_top + kDetailHeight),
+                              kTextDim);
     }
 
     if (!settings_.show_operation_hint) {

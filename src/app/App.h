@@ -13,6 +13,7 @@
 #include "ui/ConfigWindow.h"
 #include "ui/MainWindow.h"
 #include "ui/ShortcutManagerWindow.h"
+#include "ui/WelcomeWindow.h"
 
 namespace alt {
 
@@ -70,6 +71,7 @@ private:
     ConfigWindow config_window_;
     ShortcutManagerWindow manager_window_;
     AboutWindow about_window_;
+    WelcomeWindow welcome_window_;
     HotkeyRegistration hotkey_;
     HotkeyRegistration secondary_hotkey_;
     HotkeyRegistration last_item_hotkey_;

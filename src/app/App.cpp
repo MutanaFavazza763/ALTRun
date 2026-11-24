@@ -69,7 +69,8 @@ App::App(HINSTANCE instance)
       main_window_(settings_, store_, param_history_),
       config_window_(settings_),
       manager_window_(settings_, store_),
-      about_window_(settings_) {}
+      about_window_(settings_),
+      welcome_window_(settings_) {}
 
 App::~App() {
     RemoveTrayIcon();
@@ -97,9 +98,16 @@ int App::Run() {
 
     // Load the portable shortcut list; a missing ShortCutList.txt gets the
     // built-in default list, exactly like the original (deleting the file
-    // regenerates it).
+    // regenerates it).  On a true first launch the seeding waits for the
+    // welcome window: the default display names must be generated in the
+    // language the user picks there, not in the pre-welcome default.
+    const bool list_was_missing =
+        ::GetFileAttributesW(store_.list_path().c_str()) == INVALID_FILE_ATTRIBUTES;
     store_.Load();
-    store_.SeedDefaultsIfMissing();
+    const bool show_welcome = settings_.first_run || HasFlag(L"--welcome");
+    if (!(settings_.first_run && show_welcome && list_was_missing)) {
+        store_.SeedDefaultsIfMissing();
+    }
     // Recent list and parameter history are stored outside ShortCutList.txt
     // (ini LatestList / ParamHistory.txt), like the original.
     store_.SetLatestFromSpec(settings_.latest_list);
@@ -149,6 +157,31 @@ int App::Run() {
         Logger::Instance().Warn("cannot create about window");
     }
 
+    // First launch (no ALTRun.ini anywhere): language + AutoRun / SendTo plus a
+    // short usage guide.  Accepting writes the ini, so this shows exactly once.
+    // --welcome forces it for UI checks without deleting the ini.
+    if (show_welcome) {
+        if (welcome_window_.CreateWelcomeWindow(instance_)) {
+            welcome_window_.SetAcceptHandler([this, list_was_missing]() {
+                // The language chosen in the welcome window decides the names
+                // of a freshly seeded default list (original: wizard runs
+                // before the first list is written).
+                Localization::Instance().Load(settings_.lang);
+                if (list_was_missing) {
+                    store_.SeedDefaultsIfMissing();
+                    store_.Save();
+                }
+                main_window_.RefreshMatches();
+                ApplySettings();
+            });
+        } else {
+            Logger::Instance().Warn("cannot create welcome window");
+            // Without the wizard there is no language choice to wait for; seed
+            // the default list now so the launcher is still usable.
+            store_.SeedDefaultsIfMissing();
+        }
+    }
+
     if (settings_.show_tray_icon) {
         AddTrayIcon();
     }
@@ -164,7 +197,9 @@ int App::Run() {
         about_window_.Open();
     }
 
-    if (settings_.show_me_when_start || HasFlag(L"--show")) {
+    if (show_welcome && welcome_window_.hwnd() != nullptr) {
+        welcome_window_.Open();
+    } else if (settings_.show_me_when_start || HasFlag(L"--show")) {
         main_window_.ShowLauncher();
     }
 

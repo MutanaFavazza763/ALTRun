@@ -55,6 +55,10 @@ public:
                     float opacity = 1.0f);
     void DrawTextBlock(const std::wstring& text, IDWriteTextFormat* format,
                        const D2D1_RECT_F& rect, const D2D1_COLOR_F& color);
+    // Same, but a too-long line gets a trailing ellipsis instead of being cut
+    // mid-glyph at the rectangle edge.
+    void DrawTextEllipsis(const std::wstring& text, IDWriteTextFormat* format,
+                          const D2D1_RECT_F& rect, const D2D1_COLOR_F& color);
     void DrawTextBlockRaw(const wchar_t* text, UINT length, IDWriteTextFormat* format,
                           const D2D1_RECT_F& rect, const D2D1_COLOR_F& color);
 

@@ -28,6 +28,11 @@ public:
     // Converts aliases/legacy values to zh_cn, zh_hk or en_us.
     static std::string NormalizeLanguage(const std::string& lang);
 
+    // UI language suggested on first launch, from GetUserDefaultUILanguage():
+    // Chinese (Traditional/HK/Macau) -> zh_hk, other Chinese -> zh_cn,
+    // everything else -> en_us.
+    static std::string SystemDefaultLanguage();
+
     // Built-in value -> key itself.
     std::wstring Get(const std::string& key) const;
     // Alias kept for call sites that read like UI text instead of resources.

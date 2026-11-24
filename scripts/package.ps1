@@ -11,7 +11,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$Version = '2.0.3',
+    [string]$Version = '2.0.4',
     [ValidateSet('Release', 'Debug')]
     [string]$Configuration = 'Release',
     [switch]$SkipBuild,
@@ -75,8 +75,9 @@ try {
     Copy-Item 'docs/ARCHITECTURE.md' $stage
     Copy-Item 'docs/ROADMAP.md' $stage
 
-    # Sample settings, so a fresh install starts with the legacy defaults and
-    # the user can see every key without launching first.
+    # Sample settings for reference only. Keep it as .sample: an actual
+    # ALTRun.ini would make Settings::Load() treat the folder as an existing
+    # install and suppress the first-run guide.
     $ini = @'
 [Config]
 HotKey1=Alt + R
@@ -116,7 +117,7 @@ TraceEnable=0
 ShortCutRunCount=0
 LatestList=
 '@
-    Set-Content -Path (Join-Path $stage 'ALTRun.ini') -Value $ini -Encoding Default
+    Set-Content -Path (Join-Path $stage 'ALTRun.ini.sample') -Value $ini -Encoding Default
 
     # --- zip --------------------------------------------------------------
     $zip = Join-Path $distRoot "$stageName.zip"

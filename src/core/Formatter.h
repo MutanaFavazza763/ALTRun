@@ -22,6 +22,20 @@ std::string FormatListLine(std::string_view format, std::string_view keyword,
 // |index_from_0_to_9| selects the 0..9 or 1..9,0 numbering scheme.
 std::string NumberPrefix(size_t row, bool has_param, bool index_from_0_to_9);
 
+// Split form used by the launcher list: the text before and after the literal
+// separator between the two "%s" conversions ("%-25s| %s" -> keyword, "| ",
+// name).  The launcher draws these in fixed pixel columns instead of relying on
+// space padding, so proportional UI fonts still line up.
+struct ListLineParts {
+    std::string left;       // text of the first conversion (keyword)
+    std::string separator;  // literal text between the conversions ("| ")
+    std::string right;      // text of the second conversion (display name)
+    bool two_columns = false;
+};
+
+ListLineParts FormatListParts(std::string_view format, std::string_view keyword,
+                              std::string_view name);
+
 // Display width helper (CJK wide characters count as 2 columns).
 size_t DisplayWidth(std::string_view utf8);
 

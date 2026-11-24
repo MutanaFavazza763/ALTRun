@@ -2,6 +2,8 @@
 
 #include <d2d1helper.h>
 
+#include <algorithm>
+
 #include "core/Logger.h"
 
 namespace alt {
@@ -176,6 +178,44 @@ void D2DContext::DrawBitmap(ID2D1Bitmap* bitmap, const D2D1_RECT_F& dest,
 void D2DContext::DrawTextBlock(const std::wstring& text, IDWriteTextFormat* format,
                                const D2D1_RECT_F& rect, const D2D1_COLOR_F& color) {
     DrawTextBlockRaw(text.c_str(), static_cast<UINT>(text.size()), format, rect, color);
+}
+
+void D2DContext::DrawTextEllipsis(const std::wstring& text,
+                                  IDWriteTextFormat* format,
+                                  const D2D1_RECT_F& rect,
+                                  const D2D1_COLOR_F& color) {
+    if (!target_ || format == nullptr || text.empty()) {
+        return;
+    }
+    ID2D1SolidColorBrush* brush = Brush(color);
+    IDWriteFactory* write = WriteFactory();
+    if (brush == nullptr || write == nullptr) {
+        return;
+    }
+    IDWriteTextLayout* layout = nullptr;
+    if (FAILED(write->CreateTextLayout(
+            text.c_str(), static_cast<UINT32>(text.size()), format,
+            std::max(1.0f, rect.right - rect.left),
+            std::max(1.0f, rect.bottom - rect.top), &layout))) {
+        DrawTextBlockRaw(text.c_str(), static_cast<UINT>(text.size()), format,
+                         rect, color);
+        return;
+    }
+    layout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+    IDWriteInlineObject* sign = nullptr;
+    if (SUCCEEDED(write->CreateEllipsisTrimmingSign(format, &sign))) {
+        DWRITE_TRIMMING trimming = {};
+        trimming.granularity = DWRITE_TRIMMING_GRANULARITY_CHARACTER;
+        trimming.delimiter = 0;
+        trimming.delimiterCount = 0;
+        layout->SetTrimming(&trimming, sign);
+    }
+    target_->DrawTextLayout(D2D1::Point2F(rect.left, rect.top), layout, brush,
+                            D2D1_DRAW_TEXT_OPTIONS_CLIP);
+    if (sign != nullptr) {
+        sign->Release();
+    }
+    layout->Release();
 }
 
 void D2DContext::DrawTextBlockRaw(const wchar_t* text, UINT length,

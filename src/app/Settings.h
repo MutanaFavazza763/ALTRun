@@ -65,6 +65,10 @@ struct Settings {
 
     // Resolved at runtime, not persisted.
     std::wstring ini_path;
+    // True when Load() found no ALTRun.ini (portable or roaming).  App shows
+    // the first-run welcome window once and Save() clears the flag by creating
+    // the ini.
+    bool first_run = false;
 
     // Loads <exe目录>\ALTRun.ini (falls back to %APPDATA%\ALTRun\ALTRun.ini
     // only when the portable file does not exist, then to built-in defaults).
