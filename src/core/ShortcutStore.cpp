@@ -307,7 +307,10 @@ bool ShortcutStore::Load() {
         }
 
         size_t start = 0;
-        while (start <= utf8.size()) {
+        // Iterate real lines only: a trailing CRLF must not create an extra
+        // empty segment (that bug made every load/save cycle append a blank
+        // row to ShortCutList.txt).
+        while (start < utf8.size()) {
             size_t next = utf8.find('\n', start);
             if (next == std::string::npos) {
                 next = utf8.size();
@@ -335,7 +338,8 @@ bool ShortcutStore::Load() {
                                      ? favourite_bytes
                                      : AnsiToUtf8(favourite_bytes);
         size_t start = 0;
-        while (start <= utf8.size()) {
+        // Same trailing-CRLF guard as the shortcut list above.
+        while (start < utf8.size()) {
             size_t next = utf8.find('\n', start);
             if (next == std::string::npos) {
                 next = utf8.size();

@@ -62,15 +62,28 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 验收：`--config` 可打开并切换四个页签；修改后点"确定" ini 落盘且日志出现
 `config window: settings applied` / `settings applied`；取消不改变 ini。
 
-## M4 — 快捷项管理（⏳）
+## M4 — 快捷项管理（✅）
 
-- [ ] 管理器窗口（ShortCut / Name / ParamType / CommandLine 四列，拖拽排序）
-- [ ] 新增/编辑/删除/复制，重复检测（四列全等）
-- [ ] 文件/目录选择、`.lnk` 解析、拖放添加、URL 关键字推导
-- [ ] 相对/绝对路径批量转换
-- [ ] 导入/导出（文本格式）
+- [x] 管理器窗口 `ShortcutManagerWindow`（`SysListView32` 四列：关键字/显示名/参数类型/命令行，
+      空白分隔行显示为 `—`，900×560 置顶）
+- [x] 新增 / 编辑 / 删除（二次确认）/ 上移 / 下移 / 拖拽排序（`LVN_BEGINDRAG` + HitTest 插入）
+- [x] 双击行编辑、`Delete` 删除、`Insert` 新增、`F2` 编辑、右键菜单（新增/编辑/删除）
+- [x] 编辑对话框 `ShortcutEditWindow`：关键字/显示名/命令行、参数模式 4 选 1、
+      选择文件/选择目录（自动推导关键字与显示名）、测试执行、`Enter` 确定 / `Esc` 取消
+- [x] 校验：关键字为空且命令行也为空 → 生成空白分隔行；关键字为空但命令行非空 → 拒绝；
+      显示名/关键字禁止 `,` 与 `|`（会破坏存储格式）
+- [x] 重复检测：四列（关键字+显示名+参数类型+命令行）全等即拒绝（空白行不参与比较）
+- [x] 每次增删改/重排立即写回 `ShortCutList.txt`（GBK、原子替换、自动 `.bak`）
+- [x] `core/ShortcutSource`：路径/URL/命令行 → 关键字推导、`.lnk` 解析（`IShellLinkW`）、
+      相对/绝对路径转换（相对 exe 目录）
+- [x] 导入/导出（`IFileOpenDialog`/`IFileSaveDialog`，导入二次确认，自动识别 UTF-8 BOM /
+      UTF-16 BOM / 严格 UTF-8 / GBK）
+- [x] 托盘菜单"快捷项管理"入口 + 开发用 `--manager`
+- [x] 修复既有 bug：`ShortcutStore::Load()` 会因文件末尾 CRLF 多生成一个空白行，
+      导致每次启动/保存列表不断增长
 
-验收：管理器增删改后 `ShortCutList.txt` 立即落盘且旧版可读。
+验收：`--manager` 打开管理器可见 34 项 + 空白分隔行；新增/编辑/删除/拖拽后立即落盘；
+重启后列表行数不再递增（连续 3 次启停均为 42 行）；编辑对话框可打开并取消。
 
 ## M5 — 外观与系统集成（⏳）
 

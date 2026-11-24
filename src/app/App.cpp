@@ -25,6 +25,7 @@ constexpr UINT kShowMessage = WM_APP + 11;
 constexpr UINT kTrayMenuShow = 100;
 constexpr UINT kTrayMenuConfig = 101;
 constexpr UINT kTrayMenuExit = 102;
+constexpr UINT kTrayMenuManager = 103;
 
 // "Alt + R" style text is stored in the settings; this is the fallback used
 // when neither the ini nor the legacy defaults produce a valid hotkey.
@@ -62,7 +63,8 @@ bool HasFlag(const wchar_t* flag) {
 App::App(HINSTANCE instance)
     : instance_(instance),
       main_window_(settings_, store_, param_history_),
-      config_window_(settings_) {}
+      config_window_(settings_),
+      manager_window_(settings_, store_) {}
 
 App::~App() {
     RemoveTrayIcon();
@@ -125,6 +127,19 @@ int App::Run() {
         Logger::Instance().Warn("cannot create settings window");
     }
 
+    // Shortcut manager: edits are saved immediately, so the handler only has to
+    // refresh the launcher's cached match list.
+    if (manager_window_.CreateManagerWindow(instance_)) {
+        manager_window_.SetChangedHandler([this]() {
+            // Row indices changed, so previously recorded latest-list indices
+            // no longer point at the same items.
+            store_.SetLatestFromSpec("");
+            main_window_.RefreshMatches();
+        });
+    } else {
+        Logger::Instance().Warn("cannot create shortcut manager window");
+    }
+
     if (settings_.show_tray_icon) {
         AddTrayIcon();
     }
@@ -132,6 +147,9 @@ int App::Run() {
 
     if (HasFlag(L"--config") && config_window_.hwnd() != nullptr) {
         config_window_.Open();
+    }
+    if (HasFlag(L"--manager") && manager_window_.hwnd() != nullptr) {
+        manager_window_.Open();
     }
 
     if (settings_.show_me_when_start || HasFlag(L"--show")) {
@@ -210,6 +228,11 @@ LRESULT App::HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam,
                 case kTrayMenuShow:
                     main_window_.ShowLauncher();
                     return 0;
+                case kTrayMenuManager:
+                    if (manager_window_.hwnd() != nullptr) {
+                        manager_window_.Open();
+                    }
+                    return 0;
                 case kTrayMenuConfig:
                     if (config_window_.hwnd() != nullptr) {
                         config_window_.Open();
@@ -253,6 +276,7 @@ void App::OnTrayCallback(LPARAM lparam) {
 void App::ShowTrayMenu() {
     HMENU menu = ::CreatePopupMenu();
     ::AppendMenuW(menu, MF_STRING, kTrayMenuShow, L"打开 ALTRun(&O)");
+    ::AppendMenuW(menu, MF_STRING, kTrayMenuManager, L"快捷项管理(&M)");
     ::AppendMenuW(menu, MF_STRING, kTrayMenuConfig, L"设置(&S)");
     ::AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     ::AppendMenuW(menu, MF_STRING, kTrayMenuExit, L"退出(&X)");

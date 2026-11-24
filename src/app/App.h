@@ -11,6 +11,7 @@
 #include "core/ShortcutStore.h"
 #include "ui/ConfigWindow.h"
 #include "ui/MainWindow.h"
+#include "ui/ShortcutManagerWindow.h"
 
 namespace alt {
 
@@ -56,6 +57,7 @@ private:
     ParamHistory param_history_;
     MainWindow main_window_;
     ConfigWindow config_window_;
+    ShortcutManagerWindow manager_window_;
     HotkeyRegistration hotkey_;
     HotkeyRegistration secondary_hotkey_;
     HotkeyRegistration last_item_hotkey_;

@@ -38,6 +38,7 @@ src/
 │  ├─ Encoding.{h,cpp}      GBK ⇄ UTF-8、UTF-8 严格校验
 │  ├─ Text.{h,cpp}          UTF-8 ⇄ UTF-16、ASCII 大小写折叠
 │  ├─ Shortcut.{h,cpp}      快捷项模型 + ParamType 映射
+│  ├─ ShortcutSource.{h,cpp} 路径/URL/命令行 → 关键字推导、.lnk 解析、相对路径
 │  ├─ ShortcutStore.{h,cpp} ShortCutList.txt / FavoriteList.txt / LatestList
 │  ├─ ParamHistory.{h,cpp}  ParamHistory.txt 参数历史（rank 淘汰算法）
 │  ├─ Matcher.{h,cpp}       正则/通配匹配、打分、Sort() 排序键
@@ -49,7 +50,9 @@ src/
    ├─ D2DContext.{h,cpp}    D2D/DWrite 资源封装（设备丢失重建）
    ├─ MainWindow.{h,cpp}    启动器窗口：输入、结果列表、绘制、键盘/IME
    ├─ ParamWindow.{h,cpp}   参数提示窗：单行编辑 + 历史下拉 + 空闲取消
-   └─ ConfigWindow.{h,cpp}  设置窗口：原生分页控件（4 页）+ 热键捕获
+   ├─ ConfigWindow.{h,cpp}  设置窗口：原生分页控件（4 页）+ 热键捕获
+   ├─ ShortcutManagerWindow.{h,cpp}  快捷项管理器：四列 ListView + 拖拽排序 + 导入导出
+   └─ ShortcutEditWindow.{h,cpp}     单条编辑对话框（参数模式、文件/目录选择、测试）
 ```
 
 依赖方向严格单向：`ui → app → core`，`core` 不包含 `<windows.h>` 之外的 UI 头文件，
@@ -177,7 +180,25 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 - 数值输入容错：非法/空输入回退原值；按控件语义夹紧范围（Alpha 0–255、圆角 0–200、
   FormWidth 200–800、HideDelay 0–3600、ParamHistoryLimit 0–1000）。
 
-## 9. 窗口与交互
+## 9. 快捷项管理器
+
+`ShortcutManagerWindow` + `ShortcutEditWindow` 复刻原版管理界面：
+
+- 管理器：`SysListView32` 四列（关键字/显示名/参数类型/命令行），空白分隔行显示为 `—`；
+  新增（`Insert`/右键/按钮）、编辑（双击/`F2`）、删除（`Delete`，二次确认）、上移/下移、
+  **拖拽排序**（`LVN_BEGINDRAG` + `ListView_HitTest` 插入到目标行前）、导入/导出
+  （`IFileOpenDialog`/`IFileSaveDialog`，导入二次确认并自动识别 UTF-8 BOM/UTF-16/GBK）。
+- 每次变更立即 `store_.Save()`（原版同样即时落盘），随后触发 `changed_handler_`，
+  由 `App` 清空最近列表（行索引已失效）并刷新启动器缓存。
+- 编辑对话框：关键字/显示名/命令行、参数模式 4 选 1、`选择文件…`/`选择目录…`
+  （`IFileDialog`/`SHBrowseForFolder`，按 `ShortcutSource` 规则自动推导关键字与显示名）、
+  `测试`（直接走 `LaunchShortcut`）、`确定`/`取消`。
+- 校验：两者都空 → 生成空白分隔行；关键字空而命令行非空 → 拒绝；显示名/关键字含 `,`/`|`
+  → 拒绝；重复检测按四列全等（空白行不参与）。
+- `core/ShortcutSource`：路径/URL/命令行 → `Shortcut` 的推导规则（原版 §8.1）、`.lnk`
+  解析（`IShellLinkW`，图标桩目标保留 `.lnk` 本身）、相对/绝对路径转换（相对 exe 目录）。
+
+## 10. 窗口与交互
 
 - 无边框 `WS_POPUP` + `WS_EX_TOOLWINDOW | WS_EX_TOPMOST`；`DwmSetWindowAttribute`
   开启 Win11 圆角与深色模式；`Alpha<255` 时用 `WS_EX_LAYERED` + `SetLayeredWindowAttributes`。
@@ -192,7 +213,7 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 - 全局热键：`HotKey1`（默认 `Alt + R`）、`HotKey2`（默认 `Pause`，空则禁用）、
   `LastItemHotKey`（默认 `ALT+L`，当前仅唤起窗口，执行"最近项"待 M2）。
 
-## 10. 与原文的刻意差异
+## 11. 与原文的刻意差异
 
 | 编号 | 差异 | 原因 |
 |---|---|---|
@@ -210,8 +231,12 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | D12 | `ExecuteIfOnlyOne` 用 `WM_APP+20` 延迟投递执行 | 在结果列表重建过程中同步执行会重入 `RefreshMatches`/`HideLauncher` |
 | D13 | 设置窗口用原生控件 + 4 个合并页签（原版 5 Tab + 1 隐藏 Tab） | 原生控件交互可靠、代码量小；合并后覆盖同一批配置键，仅布局不同 |
 | D14 | 确定后**立即**应用热键/外观（原版部分项重启生效） | 更好的体验；`TraceEnable` 仍按原版提示"重启后生效" |
+| D15 | 管理器的空白分隔行可编辑（原版禁止） | 统一入口更方便；仍保留"两者都空=空白行"的语义 |
+| D16 | 重复检测跳过空白行；关键字也禁止 `\|` | 否则无法添加第二个分隔行；`\|` 会破坏存储格式 |
+| D17 | 管理器窗口固定 900×560、列宽固定 | `Settings` 目前没有原版的 `ManWinTop/Width/ManColWidth*` 字段，M5 再补 |
+| D18 | 管理器改动后清空最近列表 | 行索引随增删/重排失效（原版同样错位），清空比显示错误条目更安全 |
 
-## 11. 构建与运行
+## 12. 构建与运行
 
 ```powershell
 # 需要 Visual Studio（含 MSVC + Windows SDK）与 CMake ≥ 3.28
@@ -228,7 +253,7 @@ cmake --build build/vs --config Release
 运行后在 exe 目录生成：`ALTRun.ini`、`ShortCutList.txt`（+`.bak`）、
 `FavoriteList.txt`、`altRun.log`。
 
-## 12. 尚未实现（见 [ROADMAP.md](ROADMAP.md)）
+## 13. 尚未实现（见 [ROADMAP.md](ROADMAP.md)）
 
-快捷项管理/编辑/导入导出、皮肤背景与字体解析、语言文件、`AddToSendTo`、
+皮肤背景与字体解析、语言文件、`AddToSendTo`、管理器窗口尺寸/列宽记忆、
 单实例唤醒时复用已运行实例的窗口、单元测试与打包。

@@ -19,6 +19,14 @@
 |---|---|
 | ![设置-热键](docs/images/config-hotkey.png) | ![设置-外观](docs/images/config-appearance.png) |
 
+快捷项管理器与编辑对话框：
+
+![快捷项管理器](docs/images/manager.png)
+
+| 编辑对话框 |
+|---|
+| ![编辑快捷项](docs/images/shortcut-edit.png) |
+
 ## 特性（已完成）
 
 - 全局热键唤出（默认 `Alt + R`，可配第二热键），单实例，托盘图标
@@ -34,6 +42,8 @@
 - `ExecuteIfOnlyOne`、输入末尾空格、`;`、`'` 等原版快捷执行方式
 - 设置窗口（`--config` 或托盘菜单）：常规 / 热键 / 外观 / 调试·关于 四页，
   热键可直接按键捕获，确定后立即生效并写回 `ALTRun.ini`
+- 快捷项管理器（托盘菜单或 `--manager`）：四列表格增删改、拖拽排序、拖放添加、
+  `.lnk` 解析、相对/绝对路径转换、导入/导出，编辑后立即写回 `ShortCutList.txt`
 - **数据格式与旧版逐字节兼容**：`ShortCutList.txt`（GBK）、`FavoriteList.txt`、
   `ParamHistory.txt`、`ALTRun.ini`（含 `[DEBUG] LatestList`）
 - 绿色便携：所有配置与数据都在 exe 同目录，不写注册表配置
@@ -53,10 +63,12 @@ cmake --build build/vs --config Release
 产物 `build/vs/Release/ALTRun.exe`；运行后在同目录生成 `ALTRun.ini`、
 `ShortCutList.txt`、`FavoriteList.txt`、`altRun.log`。
 
-开发调试：`ALTRun.exe --show` 直接显示启动器窗口。
+开发调试：`ALTRun.exe --show` 直接显示启动器窗口，`--config` 打开设置，
+`--manager` 打开快捷项管理器。
 
 ## 文档
 
+- [使用说明](docs/USAGE.md)：热键、搜索语法、参数、最近列表、设置、数据文件与迁移
 - [架构设计](docs/ARCHITECTURE.md)：分层、数据模型、匹配/执行流程、刻意差异
 - [重写路线图](docs/ROADMAP.md)：M0–M6 里程碑与验收标准
 - 逆向规格（原 Delphi 行为，带源码行号）：
@@ -78,7 +90,7 @@ resources/ 运行时资源（皮肤、语言、图标，M5 使用）
 ## 状态
 
 里程碑 M0（规格）、M1（可运行骨架）、M2（参数窗 / 参数历史 / 最近列表）、
-M3（设置界面）完成；快捷项管理、皮肤/多语言、单元测试与打包正在按
+M3（设置界面）、M4（快捷项管理器）完成；皮肤/多语言、单元测试与打包正在按
 [ROADMAP.md](docs/ROADMAP.md) 推进。
 
 ## 许可

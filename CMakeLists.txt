@@ -25,12 +25,15 @@ set(ALTRUN_SOURCES
     src/core/Matcher.cpp
     src/core/ParamHistory.cpp
     src/core/Shortcut.cpp
+    src/core/ShortcutSource.cpp
     src/core/ShortcutStore.cpp
     src/core/Text.cpp
     src/ui/ConfigWindow.cpp
     src/ui/D2DContext.cpp
     src/ui/MainWindow.cpp
     src/ui/ParamWindow.cpp
+    src/ui/ShortcutEditWindow.cpp
+    src/ui/ShortcutManagerWindow.cpp
     src/ui/Window.cpp
 )
 
@@ -45,12 +48,15 @@ set(ALTRUN_HEADERS
     src/core/Matcher.h
     src/core/ParamHistory.h
     src/core/Shortcut.h
+    src/core/ShortcutSource.h
     src/core/ShortcutStore.h
     src/core/Text.h
     src/ui/ConfigWindow.h
     src/ui/D2DContext.h
     src/ui/MainWindow.h
     src/ui/ParamWindow.h
+    src/ui/ShortcutEditWindow.h
+    src/ui/ShortcutManagerWindow.h
     src/ui/Window.h
 )
 
