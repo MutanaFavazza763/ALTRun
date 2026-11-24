@@ -46,6 +46,11 @@ struct Settings {
 
     // [GUI]
     std::string bg_file_name = "BG.jpg";  // BGFileName
+    // TitleFont / KeywordFont / ListFont: legacy 5-segment font strings
+    // (<family>|[]|12|65535|0); parsed by core/FontSpec.
+    std::string title_font = "Segoe UI|[]|12|65535|0";    // TitleFont
+    std::string keyword_font = "Segoe UI|[]|12|255|0";    // KeywordFont
+    std::string list_font = "Segoe UI|[]|12|8388608|0";   // ListFont
     std::string lang = "EN";              // Lang
     std::string list_format = "%-25s| %s";  // ListFormat
     int alpha = 240;                      // Alpha

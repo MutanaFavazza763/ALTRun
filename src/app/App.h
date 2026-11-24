@@ -9,6 +9,7 @@
 #include "app/Settings.h"
 #include "core/ParamHistory.h"
 #include "core/ShortcutStore.h"
+#include "ui/AboutWindow.h"
 #include "ui/ConfigWindow.h"
 #include "ui/MainWindow.h"
 #include "ui/ShortcutManagerWindow.h"
@@ -58,6 +59,7 @@ private:
     MainWindow main_window_;
     ConfigWindow config_window_;
     ShortcutManagerWindow manager_window_;
+    AboutWindow about_window_;
     HotkeyRegistration hotkey_;
     HotkeyRegistration secondary_hotkey_;
     HotkeyRegistration last_item_hotkey_;

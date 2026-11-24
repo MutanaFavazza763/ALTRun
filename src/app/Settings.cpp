@@ -130,6 +130,11 @@ void Settings::Load() {
     win_left = ReadInt(ini, L"Window", L"WinLeft", win_left);
 
     bg_file_name = ReadString(ini, L"GUI", L"BGFileName", bg_file_name);
+    // Empty values fall back to the current (default) font strings, matching
+    // the original "empty -> DEFAULT_*_FONT_STR" rule (spec §1.5).
+    title_font = ReadString(ini, L"GUI", L"TitleFont", title_font);
+    keyword_font = ReadString(ini, L"GUI", L"KeywordFont", keyword_font);
+    list_font = ReadString(ini, L"GUI", L"ListFont", list_font);
     lang = ReadString(ini, L"GUI", L"Lang", lang);
     list_format = ReadString(ini, L"GUI", L"ListFormat", list_format);
     alpha = ReadInt(ini, L"GUI", L"Alpha", alpha);
@@ -178,6 +183,9 @@ bool Settings::Save() const {
     WriteInt(ini, L"Window", L"WinLeft", win_left);
 
     WriteStr(ini, L"GUI", L"BGFileName", bg_file_name);
+    WriteStr(ini, L"GUI", L"TitleFont", title_font);
+    WriteStr(ini, L"GUI", L"KeywordFont", keyword_font);
+    WriteStr(ini, L"GUI", L"ListFont", list_font);
     WriteStr(ini, L"GUI", L"Lang", lang);
     WriteStr(ini, L"GUI", L"ListFormat", list_format);
     WriteInt(ini, L"GUI", L"Alpha", alpha);

@@ -38,12 +38,21 @@ public:
     IDWriteTextFormat* CreateFormat(float size, DWRITE_FONT_WEIGHT weight,
                                     DWRITE_TEXT_ALIGNMENT alignment =
                                         DWRITE_TEXT_ALIGNMENT_LEADING);
+    // Same as above but with an explicit font family (used by MainWindow for
+    // the [GUI] TitleFont/KeywordFont/ListFont strings).
+    IDWriteTextFormat* CreateFormat(const std::wstring& family, float size,
+                                    DWRITE_FONT_WEIGHT weight,
+                                    DWRITE_TEXT_ALIGNMENT alignment =
+                                        DWRITE_TEXT_ALIGNMENT_LEADING);
 
     void FillRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& color);
     void FillRoundedRect(const D2D1_RECT_F& rect, float radius,
                          const D2D1_COLOR_F& color);
     void DrawRoundedBorder(const D2D1_RECT_F& rect, float radius,
                            const D2D1_COLOR_F& color, float width = 1.0f);
+    // Stretches bitmap into dest; used for the skinned background.
+    void DrawBitmap(ID2D1Bitmap* bitmap, const D2D1_RECT_F& dest,
+                    float opacity = 1.0f);
     void DrawTextBlock(const std::wstring& text, IDWriteTextFormat* format,
                        const D2D1_RECT_F& rect, const D2D1_COLOR_F& color);
     void DrawTextBlockRaw(const wchar_t* text, UINT length, IDWriteTextFormat* format,

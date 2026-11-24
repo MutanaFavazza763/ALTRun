@@ -33,10 +33,13 @@ src/
 ├─ app/                     进程级编排
 │  ├─ App.{h,cpp}           单实例、消息循环、托盘、热键分发、自启动
 │  ├─ Hotkey.{h,cpp}        解析 "Alt + R" 并 RegisterHotKey
-│  └─ Settings.{h,cpp}      ALTRun.ini 读写（键名与旧版一致）
+│  ├─ Settings.{h,cpp}      ALTRun.ini 读写（键名与旧版一致）
+│  └─ ShellIntegration.{h,cpp}  SendTo 快捷方式、Popup.wav 提示音
 ├─ core/                    无 UI 依赖的可测试逻辑
 │  ├─ Encoding.{h,cpp}      GBK ⇄ UTF-8、UTF-8 严格校验
 │  ├─ Text.{h,cpp}          UTF-8 ⇄ UTF-16、ASCII 大小写折叠
+│  ├─ FontSpec.{h,cpp}      旧版字体串 `字体名|[]|12|65535|0` 解析/序列化
+│  ├─ Localization.{h,cpp}  `<Lang>.lang` 加载 + 内置 EN/中文回退
 │  ├─ Shortcut.{h,cpp}      快捷项模型 + ParamType 映射
 │  ├─ ShortcutSource.{h,cpp} 路径/URL/命令行 → 关键字推导、.lnk 解析、相对路径
 │  ├─ ShortcutStore.{h,cpp} ShortCutList.txt / FavoriteList.txt / LatestList
@@ -48,6 +51,8 @@ src/
 └─ ui/
    ├─ Window.{h,cpp}        无边框窗口基类 + 消息分发
    ├─ D2DContext.{h,cpp}    D2D/DWrite 资源封装（设备丢失重建）
+   ├─ SkinImage.{h,cpp}     WIC 解码皮肤图（JPG/PNG/BMP）→ ID2D1Bitmap
+   ├─ AboutWindow.{h,cpp}   关于窗口（版本、About.<Lang> 正文）
    ├─ MainWindow.{h,cpp}    启动器窗口：输入、结果列表、绘制、键盘/IME
    ├─ ParamWindow.{h,cpp}   参数提示窗：单行编辑 + 历史下拉 + 空闲取消
    ├─ ConfigWindow.{h,cpp}  设置窗口：原生分页控件（4 页）+ 热键捕获
@@ -198,7 +203,26 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 - `core/ShortcutSource`：路径/URL/命令行 → `Shortcut` 的推导规则（原版 §8.1）、`.lnk`
   解析（`IShellLinkW`，图标桩目标保留 `.lnk` 本身）、相对/绝对路径转换（相对 exe 目录）。
 
-## 10. 窗口与交互
+## 10. 外观、多语言与系统集成
+
+- **皮肤**：`[GUI] BGFileName`（默认 `BG.jpg`）指向 exe 同目录的图片，`SkinImage` 用 WIC
+  解码为 D2D 位图；`DrawFrame` 先按 cover 方式铺满窗口，再叠加 0.74 透明度的圆角面板，
+  最后绘制标题/输入/列表。图片缺失、解码失败或 `ShowSkin=0` 时静默回退纯色背景。
+  设备丢失重建 render target 后会重新加载位图。
+- **字体**：`TitleFont/KeywordFont/ListFont` 沿用旧版五段格式（`Family|StyleSet|Size|TColor|Charset`），
+  `FontSpec` 容错解析后用于创建 `IDWriteTextFormat`（磅值 → DIP 直接可用；`[fsBold]` → 粗体）。
+- **多语言**：`Localization` 读取 `<exe目录>\<Lang>.lang`（INI 风格，UTF-8/BOM/GBK/UTF-16 均可），
+  键查找顺序为 **文件 → 内置表 → 键名本身**；内置表覆盖主窗口文案（`resTitle`、`resItemCount`、
+  `resHintInput`、`resHintOperation`、`resNoMatch`、`resCannotExecute` 等），`EN` 与中文两套。
+  修改 `Lang` 并确定后立即重新加载（无需重启）。
+- **提示音**：`ShowLauncher()` 成功后按 `PlayPopupNotify` 播放 `<exe目录>\Popup.wav`
+  （`PlaySoundW`，`SND_ASYNC|SND_NODEFAULT`，缺失静默）。
+- **发送到菜单**：`AddToSendTo=1` 时用 `IShellLinkW` 在
+  `%APPDATA%\Microsoft\Windows\SendTo\ALTRun.lnk` 创建/重建快捷方式，关闭时删除；设置里改完立即生效。
+- **关于窗口**：版本、原版仓库链接、`ShortCutRunCount`、ini/数据目录、`About.<Lang>` 自由文本
+  （原生只读多行 EDIT + 滚动），缺失时用内置文本。托盘菜单"关于(&A)"打开，`--about` 便于开发查看。
+
+## 11. 窗口与交互
 
 - 无边框 `WS_POPUP` + `WS_EX_TOOLWINDOW | WS_EX_TOPMOST`；`DwmSetWindowAttribute`
   开启 Win11 圆角与深色模式；`Alpha<255` 时用 `WS_EX_LAYERED` + `SetLayeredWindowAttributes`。
@@ -213,7 +237,7 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 - 全局热键：`HotKey1`（默认 `Alt + R`）、`HotKey2`（默认 `Pause`，空则禁用）、
   `LastItemHotKey`（默认 `ALT+L`，当前仅唤起窗口，执行"最近项"待 M2）。
 
-## 11. 与原文的刻意差异
+## 12. 与原文的刻意差异
 
 | 编号 | 差异 | 原因 |
 |---|---|---|
@@ -235,25 +259,39 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | D16 | 重复检测跳过空白行；关键字也禁止 `\|` | 否则无法添加第二个分隔行；`\|` 会破坏存储格式 |
 | D17 | 管理器窗口固定 900×560、列宽固定 | `Settings` 目前没有原版的 `ManWinTop/Width/ManColWidth*` 字段，M5 再补 |
 | D18 | 管理器改动后清空最近列表 | 行索引随增删/重排失效（原版同样错位），清空比显示错误条目更安全 |
+| D19 | 字体串第 2 段按"样式集"、第 5 段按"字符集"解析 | 与规格 §1.7/§5.1 一致；若按相反映射，典型串 `SimSun\|[]\|12\|65535\|0` 结果相同，只有非空且冲突的串才有区别 |
+| D20 | 皮肤之上的面板固定 0.74 透明度，未与 `Alpha` 联动 | `Alpha` 仍作用于整窗分层透明度，保持原版"整窗半透明"语义；面板透明度用于保证文字可读 |
+| D21 | 不内嵌默认 `BG.jpg`/`Popup.wav` 资源 | 重写版无资源段；缺失时静默回退纯色/不播放（原版会从资源释放） |
+| D22 | 本地化目前只覆盖主窗口文案与关于窗动态字段 | 设置/管理器/编辑/参数窗仍是中文硬编码；外部 224 键 `.lang` 可加载且缺键回退 |
+| D23 | 关于窗 420×360（原版约 420×320） | 为容纳 7 行信息 + 可滚动正文 |
 
-## 12. 构建与运行
+## 13. 构建、测试与打包
 
 ```powershell
 # 需要 Visual Studio（含 MSVC + Windows SDK）与 CMake ≥ 3.28
 cmake -S . -B build/vs -G "Visual Studio 18 2026" -A x64
 cmake --build build/vs --config Release
 
-# 产物：build/vs/Release/ALTRun.exe（res/ 会一并复制）
-# 开发期直接展示窗口：
-.\build\vs\Release\ALTRun.exe --show
+# 产物：build/vs/Release/ALTRun.exe + altRunTests.exe（res/ 会一并复制）
+.\build\vs\Release\ALTRun.exe --show      # 开发期直接展示启动器
+.\build\vs\Release\altRunTests.exe        # 核心单元测试（116 项断言）
+ctest --test-dir build/vs -C Release      # 或通过 CTest 运行
+
+# 便携版打包（exe + res + 文档 + 样例 ALTRun.ini → dist/ALTRun-<版本>-win64.zip）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -Version 2.0.0
 ```
 
 或使用预设：`cmake --preset msvc-release` / `cmake --build --preset release`（Ninja）。
+`-DALTRUN_BUILD_TESTS=OFF` 可跳过测试目标。
 
 运行后在 exe 目录生成：`ALTRun.ini`、`ShortCutList.txt`（+`.bak`）、
-`FavoriteList.txt`、`altRun.log`。
+`FavoriteList.txt`、`ParamHistory.txt`、`altRun.log`。
 
-## 13. 尚未实现（见 [ROADMAP.md](ROADMAP.md)）
+单元测试覆盖：GBK ⇄ UTF-8 往返、`ListFormat`/数字前缀/CJK 宽度、通配符→正则、
+打分公式与 `Sort()` 排序键、`ShortCutList.txt` 新旧两种格式解析与序列化往返、
+参数历史淘汰语义、路径/URL/.lnk 关键字推导、字体串容错解析、本地化回退。
 
-皮肤背景与字体解析、语言文件、`AddToSendTo`、管理器窗口尺寸/列宽记忆、
-单实例唤醒时复用已运行实例的窗口、单元测试与打包。
+## 14. 尚未实现（见 [ROADMAP.md](ROADMAP.md)）
+
+其它窗口（设置/管理器/编辑/参数）的本地化接入、管理器窗口尺寸与列宽记忆、
+单实例唤醒时复用已运行实例的窗口、CI 配置。

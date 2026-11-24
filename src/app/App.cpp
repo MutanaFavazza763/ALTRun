@@ -6,6 +6,8 @@
 
 #include <string>
 
+#include "app/ShellIntegration.h"
+#include "core/Localization.h"
 #include "core/Logger.h"
 #include "core/Text.h"
 
@@ -26,6 +28,7 @@ constexpr UINT kTrayMenuShow = 100;
 constexpr UINT kTrayMenuConfig = 101;
 constexpr UINT kTrayMenuExit = 102;
 constexpr UINT kTrayMenuManager = 103;
+constexpr UINT kTrayMenuAbout = 104;
 
 // "Alt + R" style text is stored in the settings; this is the fallback used
 // when neither the ini nor the legacy defaults produce a valid hotkey.
@@ -64,7 +67,8 @@ App::App(HINSTANCE instance)
     : instance_(instance),
       main_window_(settings_, store_, param_history_),
       config_window_(settings_),
-      manager_window_(settings_, store_) {}
+      manager_window_(settings_, store_),
+      about_window_(settings_) {}
 
 App::~App() {
     RemoveTrayIcon();
@@ -82,6 +86,14 @@ int App::Run() {
     settings_.Load();
     Logger::Instance().SetEnabled(settings_.trace_enabled);
     Logger::Instance().Info("ALTRun starting, exe=" + ToUtf8(ExePath()));
+
+    // Language resources (file <Lang>.lang, built-in fallback) must be ready
+    // before any window is shown; changing Lang later re-runs this in
+    // ApplySettings().
+    Localization::Instance().Load(settings_.lang);
+    // AddToSendTo is a system integration that is re-applied on every startup
+    // (idempotent), exactly like the original.
+    ShellIntegration::ApplyAddToSendTo(settings_.add_to_send_to, ExePath());
 
     // Load the portable shortcut list; a missing ShortCutList.txt gets the
     // built-in default list, exactly like the original (deleting the file
@@ -140,6 +152,11 @@ int App::Run() {
         Logger::Instance().Warn("cannot create shortcut manager window");
     }
 
+    // About window (tray menu "关于"): native controls, created once and reused.
+    if (!about_window_.CreateAboutWindow(instance_)) {
+        Logger::Instance().Warn("cannot create about window");
+    }
+
     if (settings_.show_tray_icon) {
         AddTrayIcon();
     }
@@ -150,6 +167,9 @@ int App::Run() {
     }
     if (HasFlag(L"--manager") && manager_window_.hwnd() != nullptr) {
         manager_window_.Open();
+    }
+    if (HasFlag(L"--about") && about_window_.hwnd() != nullptr) {
+        about_window_.Open();
     }
 
     if (settings_.show_me_when_start || HasFlag(L"--show")) {
@@ -238,6 +258,11 @@ LRESULT App::HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam,
                         config_window_.Open();
                     }
                     return 0;
+                case kTrayMenuAbout:
+                    if (about_window_.hwnd() != nullptr) {
+                        about_window_.Open();
+                    }
+                    return 0;
                 case kTrayMenuExit:
                     RequestExit();
                     return 0;
@@ -278,6 +303,7 @@ void App::ShowTrayMenu() {
     ::AppendMenuW(menu, MF_STRING, kTrayMenuShow, L"打开 ALTRun(&O)");
     ::AppendMenuW(menu, MF_STRING, kTrayMenuManager, L"快捷项管理(&M)");
     ::AppendMenuW(menu, MF_STRING, kTrayMenuConfig, L"设置(&S)");
+    ::AppendMenuW(menu, MF_STRING, kTrayMenuAbout, L"关于(&A)");
     ::AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     ::AppendMenuW(menu, MF_STRING, kTrayMenuExit, L"退出(&X)");
 
@@ -344,7 +370,15 @@ void App::ApplySettings() {
 
     Logger::Instance().SetEnabled(settings_.trace_enabled);
     ApplyAutoRun(settings_.auto_run);
+    // Language may have changed (ConfigWindow writes [GUI] Lang): reload the
+    // .lang file / built-in fallback before the launcher re-renders.
+    Localization::Instance().Load(settings_.lang);
+    // AddToSendTo must take effect immediately when the checkbox is toggled.
+    ShellIntegration::ApplyAddToSendTo(settings_.add_to_send_to, ExePath());
     main_window_.ApplySettings();
+    if (about_window_.hwnd() != nullptr) {
+        about_window_.RefreshTexts();
+    }
     Logger::Instance().Info("settings applied");
 }
 

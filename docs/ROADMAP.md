@@ -85,22 +85,42 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 验收：`--manager` 打开管理器可见 34 项 + 空白分隔行；新增/编辑/删除/拖拽后立即落盘；
 重启后列表行数不再递增（连续 3 次启停均为 42 行）；编辑对话框可打开并取消。
 
-## M5 — 外观与系统集成（⏳）
+## M5 — 外观与系统集成（✅）
 
-- [ ] 皮肤背景图（`BGFileName`）+ 字体字符串解析（`字体名|[]|12|65535|0`）
-- [ ] 语言文件（`<Lang>.lang`，224 个键）+ 切换语言
-- [ ] 提示音 `Popup.wav`、`PlayPopupNotify`
-- [ ] `AddToSendTo`、`AutoRun` 启动文件夹 `.lnk`（原版实现方式）
-- [ ] 关于/帮助窗口
+- [x] 皮肤背景图（`BGFileName`，WIC 解码 JPG/PNG/BMP → D2D 位图，cover 铺满 +
+      0.74 透明面板保证可读；缺失/`ShowSkin=0` 静默回退纯色）
+- [x] 字体串解析（`TitleFont/KeywordFont/ListFont`：`字体名|样式集|磅值|TColor|字符集`，
+      容错解析、五段序列化、`fsBold` → 粗体）
+- [x] 多语言框架（`Localization`：`<Lang>.lang` UTF-8/BOM/GBK/UTF-16，INI 风格；
+      文件 → 内置 EN/中文 → 键名 三级回退；主窗口文案与关于窗动态字段已接入）
+- [x] 提示音 `Popup.wav`（`PlayPopupNotify`，`PlaySoundW` 异步，缺失静默）
+- [x] `AddToSendTo`（`%APPDATA%\Microsoft\Windows\SendTo\ALTRun.lnk`，设置里改完立即生效）
+- [x] 关于窗口（版本、原版仓库链接、`ShortCutRunCount`、ini/数据目录、`About.<Lang>` 正文；
+      托盘菜单"关于(&A)"与开发用 `--about`）
+- [x] 设置界面外观页新增"背景图片文件名"，改完点确定即重新加载皮肤
 
-验收：切换语言后 UI 文案变化；自定义背景图与字体生效。
+验收：设置自定义字体后标题/关键字/列表字号字族变化；放入 `BG.jpg` 后启动器显示皮肤；
+`简体中文.lang` 覆盖内置文案（日志 `localization: loaded N entries`）；`--about` 可打开。
 
-## M6 — 质量与发布（⏳）
+## M6 — 质量与发布（✅）
 
-- [ ] `Matcher` / `ShortcutStore` / `Formatter` / `ParamHistory` 单元测试
-      （含 GBK 中文用例、缺陷回归）
-- [ ] 与原版 `ShortCutList.txt` 真实样本的兼容性测试
-- [ ] Release 打包（zip：exe + res + 默认 ini + 默认列表）
-- [ ] 使用说明文档与截图
+- [x] `altRunTests` 单元测试目标（116 项断言，CTest 集成，`-DALTRUN_BUILD_TESTS=OFF` 可关）：
+      Encoding（GBK 中文往返）、Formatter（ListFormat/前缀/CJK 宽度）、Matcher（通配符转换、
+      打分公式、`Sort()` 排序键、大小写、空行跳过）、ShortcutStore（新旧格式解析/序列化往返、
+      含 `|` 的命令行）、ParamHistory（rank 递增与最小 rank 淘汰）、ShortcutSource（路径/URL
+      关键字推导、目录名不截断、缺失 .lnk）、FontSpec、Localization 回退
+- [x] 编码兼容验证：读取 GBK 编码的 `ShortCutList.txt`（日志 `decoded as ANSI/GBK`）、
+      修复尾部 CRLF 导致空行累积的缺陷
+- [x] Release 便携打包：`scripts/package.ps1`（自动找 CMake → 构建 → 暂存 exe/res/文档/样例 ini
+      → `dist/ALTRun-<版本>-win64.zip`），已实测 0.21 MB 包在干净目录运行并生成数据文件
+- [x] 使用说明 [USAGE.md](USAGE.md) 与 10 张界面截图（启动器/皮肤/多语言/参数/设置/管理器/关于）
+- [ ] CI（GitHub Actions）：本地已有 `ctest`/打包一键命令，CI 待后续接入
 
-验收：CI 可一键构建；兼容性测试通过；发布包在干净 Windows 11 上可直接运行。
+验收：`ctest -C Release` 全绿；`scripts/package.ps1` 产出 zip；解压后直接运行 exe 正常。
+
+## 后续可选增强（⏳）
+
+- [ ] 设置/管理器/编辑/参数窗接入本地化（补全 224 键内置表）
+- [ ] 管理器窗口尺寸/列宽记忆（原版 `ManWin*`/`ManColWidth*`）
+- [ ] 单实例唤醒时复用已运行实例（`HandleID` 消息）
+- [ ] GitHub Actions CI 与代码签名

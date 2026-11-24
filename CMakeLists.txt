@@ -18,9 +18,12 @@ set(ALTRUN_SOURCES
     src/app/App.cpp
     src/app/Hotkey.cpp
     src/app/Settings.cpp
+    src/app/ShellIntegration.cpp
     src/core/Encoding.cpp
+    src/core/FontSpec.cpp
     src/core/Formatter.cpp
     src/core/Launcher.cpp
+    src/core/Localization.cpp
     src/core/Logger.cpp
     src/core/Matcher.cpp
     src/core/ParamHistory.cpp
@@ -28,12 +31,14 @@ set(ALTRUN_SOURCES
     src/core/ShortcutSource.cpp
     src/core/ShortcutStore.cpp
     src/core/Text.cpp
+    src/ui/AboutWindow.cpp
     src/ui/ConfigWindow.cpp
     src/ui/D2DContext.cpp
     src/ui/MainWindow.cpp
     src/ui/ParamWindow.cpp
     src/ui/ShortcutEditWindow.cpp
     src/ui/ShortcutManagerWindow.cpp
+    src/ui/SkinImage.cpp
     src/ui/Window.cpp
 )
 
@@ -41,9 +46,12 @@ set(ALTRUN_HEADERS
     src/app/App.h
     src/app/Hotkey.h
     src/app/Settings.h
+    src/app/ShellIntegration.h
     src/core/Encoding.h
+    src/core/FontSpec.h
     src/core/Formatter.h
     src/core/Launcher.h
+    src/core/Localization.h
     src/core/Logger.h
     src/core/Matcher.h
     src/core/ParamHistory.h
@@ -51,12 +59,14 @@ set(ALTRUN_HEADERS
     src/core/ShortcutSource.h
     src/core/ShortcutStore.h
     src/core/Text.h
+    src/ui/AboutWindow.h
     src/ui/ConfigWindow.h
     src/ui/D2DContext.h
     src/ui/MainWindow.h
     src/ui/ParamWindow.h
     src/ui/ShortcutEditWindow.h
     src/ui/ShortcutManagerWindow.h
+    src/ui/SkinImage.h
     src/ui/Window.h
 )
 
@@ -88,6 +98,8 @@ target_link_libraries(ALTRun PRIVATE
     gdi32
     ole32
     advapi32
+    windowscodecs   # WIC: skin background decode
+    winmm           # PlaySoundW: Popup.wav notification
 )
 
 # Keep the executable next to runtime assets (skin, lang files, ini).
@@ -97,3 +109,52 @@ add_custom_command(TARGET ALTRun POST_BUILD
             ${CMAKE_CURRENT_SOURCE_DIR}/resources
             $<TARGET_FILE_DIR:ALTRun>/res
     COMMENT "Copying runtime resources next to ALTRun.exe")
+
+# --- unit tests -------------------------------------------------------------
+# UI-independent core logic only, so the tests run headless. Enable with
+# -DALTRUN_BUILD_TESTS=OFF to skip, or run `ctest -C Release` after building.
+option(ALTRUN_BUILD_TESTS "Build ALTRun core unit tests" ON)
+
+if(ALTRUN_BUILD_TESTS)
+    set(ALTRUN_CORE_SOURCES
+        src/core/Encoding.cpp
+        src/core/FontSpec.cpp
+        src/core/Formatter.cpp
+        src/core/Launcher.cpp
+        src/core/Localization.cpp
+        src/core/Logger.cpp
+        src/core/Matcher.cpp
+        src/core/ParamHistory.cpp
+        src/core/Shortcut.cpp
+        src/core/ShortcutSource.cpp
+        src/core/ShortcutStore.cpp
+        src/core/Text.cpp
+    )
+
+    add_executable(altRunTests tests/test_main.cpp ${ALTRUN_CORE_SOURCES})
+
+    target_include_directories(altRunTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+    target_compile_definitions(altRunTests PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+
+    target_compile_options(altRunTests PRIVATE
+        $<$<CXX_COMPILER_ID:MSVC>:/utf-8 /W4 /permissive- /EHsc>
+    )
+
+    target_link_libraries(altRunTests PRIVATE
+        shell32
+        shlwapi
+        ole32
+        user32
+        gdi32
+        advapi32
+    )
+
+    enable_testing()
+    add_test(NAME altRunCore COMMAND altRunTests)
+endif()

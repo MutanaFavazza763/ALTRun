@@ -100,14 +100,20 @@ void D2DContext::EndDraw() {
 
 IDWriteTextFormat* D2DContext::CreateFormat(float size, DWRITE_FONT_WEIGHT weight,
                                             DWRITE_TEXT_ALIGNMENT alignment) {
+    return CreateFormat(L"Segoe UI", size, weight, alignment);
+}
+
+IDWriteTextFormat* D2DContext::CreateFormat(const std::wstring& family, float size,
+                                            DWRITE_FONT_WEIGHT weight,
+                                            DWRITE_TEXT_ALIGNMENT alignment) {
     IDWriteFactory* write = WriteFactory();
     if (write == nullptr) {
         return nullptr;
     }
     IDWriteTextFormat* format = nullptr;
     const HRESULT hr = write->CreateTextFormat(
-        L"Segoe UI", nullptr, weight, DWRITE_FONT_STYLE_NORMAL,
-        DWRITE_FONT_STRETCH_NORMAL, size,
+        family.empty() ? L"Segoe UI" : family.c_str(), nullptr, weight,
+        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size,
         L"zh-cn",  // locale only affects shaping fallbacks, not the language UI
         &format);
     if (FAILED(hr)) {
@@ -157,6 +163,14 @@ void D2DContext::DrawRoundedBorder(const D2D1_RECT_F& rect, float radius,
         target_->DrawRoundedRectangle(D2D1::RoundedRect(rect, radius, radius), brush,
                                       width);
     }
+}
+
+void D2DContext::DrawBitmap(ID2D1Bitmap* bitmap, const D2D1_RECT_F& dest,
+                            float opacity) {
+    if (!target_ || bitmap == nullptr) {
+        return;
+    }
+    target_->DrawBitmap(bitmap, dest, opacity, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
 }
 
 void D2DContext::DrawTextBlock(const std::wstring& text, IDWriteTextFormat* format,

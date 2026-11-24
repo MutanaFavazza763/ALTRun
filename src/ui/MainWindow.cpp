@@ -7,8 +7,11 @@
 #include <algorithm>
 #include <cctype>
 
+#include "app/ShellIntegration.h"
+#include "core/FontSpec.h"
 #include "core/Formatter.h"
 #include "core/Launcher.h"
+#include "core/Localization.h"
 #include "core/Logger.h"
 #include "core/Text.h"
 #include "ui/ParamWindow.h"
@@ -25,11 +28,6 @@ constexpr float kFooterHeight = 20.0f;
 constexpr size_t kTopTenRows = 10;
 constexpr size_t kMaxVisibleRows = 16;
 
-// The original stored its fonts as INI strings ("字体名|[]|12|65535|0"); the
-// parser arrives with the config milestone, these are the effective defaults.
-constexpr float kQueryFontSize = 18.0f;
-constexpr float kListFontSize = 15.0f;
-
 constexpr UINT kTimerCaret = 1;
 constexpr UINT kTimerHide = 2;
 constexpr UINT kCaretBlinkMs = 530;
@@ -39,6 +37,10 @@ constexpr UINT kCaretBlinkMs = 530;
 constexpr UINT kMessageAutoExecute = WM_APP + 20;
 
 const D2D1_COLOR_F kBackground = D2D1::ColorF(0.102f, 0.110f, 0.125f, 1.0f);
+// Semi-transparent panel painted on top of the skin bitmap so the text stays
+// readable; the opacity is a compromise between the original solid look and
+// letting the skin show through.
+const D2D1_COLOR_F kPanelOverlay = D2D1::ColorF(0.102f, 0.110f, 0.125f, 0.74f);
 const D2D1_COLOR_F kBorder = D2D1::ColorF(0.239f, 0.255f, 0.290f, 1.0f);
 const D2D1_COLOR_F kSelected = D2D1::ColorF(0.161f, 0.290f, 0.435f, 1.0f);
 const D2D1_COLOR_F kHover = D2D1::ColorF(0.145f, 0.157f, 0.176f, 1.0f);
@@ -46,6 +48,28 @@ const D2D1_COLOR_F kTextBright = D2D1::ColorF(0.925f, 0.937f, 0.957f, 1.0f);
 const D2D1_COLOR_F kTextDim = D2D1::ColorF(0.541f, 0.569f, 0.612f, 1.0f);
 const D2D1_COLOR_F kAccent = D2D1::ColorF(0.361f, 0.659f, 0.988f, 1.0f);
 const D2D1_COLOR_F kCaret = D2D1::ColorF(0.361f, 0.659f, 0.988f, 1.0f);
+
+// Localized resource lookup (see core/Localization; original key names are
+// documented in docs/spec/02-config-options.md §1.8/§6.2).
+std::wstring Loc(const char* key) {
+    return Localization::Instance().Get(key);
+}
+
+// FontSpec sizes are points (Delphi TFont.Size); DirectWrite takes DIPs
+// (1 DIP = 1/96 inch, 1 pt = 1/72 inch).
+float PointsToDip(float points) {
+    return std::clamp(points, 6.0f, 96.0f) * (96.0f / 72.0f);
+}
+
+// Replaces the single "%d" token used by the count formats.
+std::wstring FormatCount(std::wstring pattern, size_t count) {
+    const std::wstring token = L"%d";
+    const size_t position = pattern.find(token);
+    if (position != std::wstring::npos) {
+        pattern.replace(position, token.size(), std::to_wstring(count));
+    }
+    return pattern;
+}
 
 }  // namespace
 
@@ -71,19 +95,10 @@ bool MainWindow::CreateMain(HINSTANCE instance) {
 }
 
 void MainWindow::OnCreate() {
-    title_format_.Attach(d2d_.CreateFormat(11.0f, DWRITE_FONT_WEIGHT_SEMI_BOLD));
-    query_format_.Attach(
-        d2d_.CreateFormat(kQueryFontSize, DWRITE_FONT_WEIGHT_NORMAL));
-    row_format_.Attach(
-        d2d_.CreateFormat(kListFontSize, DWRITE_FONT_WEIGHT_NORMAL));
-    row_bold_format_.Attach(
-        d2d_.CreateFormat(kListFontSize, DWRITE_FONT_WEIGHT_SEMI_BOLD));
-    hint_format_.Attach(d2d_.CreateFormat(11.0f, DWRITE_FONT_WEIGHT_NORMAL));
-    mono_format_.Attach(d2d_.CreateFormat(kListFontSize,
-                                          DWRITE_FONT_WEIGHT_NORMAL));
-
     ::SetTimer(hwnd_, kTimerCaret, kCaretBlinkMs, nullptr);
     d2d_.Initialize(hwnd_);
+    CreateTextFormats();
+    ReloadSkin();
     UpdateWindowAlpha();
     Relayout();
 
@@ -91,6 +106,77 @@ void MainWindow::OnCreate() {
     ::DwmSetWindowAttribute(hwnd_, 33, &corner_pref, sizeof(corner_pref));
     const BOOL dark = TRUE;
     ::DwmSetWindowAttribute(hwnd_, 20, &dark, sizeof(dark));
+}
+
+void MainWindow::CreateTextFormats() {
+    title_format_.Reset();
+    query_format_.Reset();
+    row_format_.Reset();
+    row_bold_format_.Reset();
+    hint_format_.Reset();
+    mono_format_.Reset();
+
+    // Font strings come from [GUI] TitleFont/KeywordFont/ListFont; FontSpec is
+    // tolerant so a hand-edited/corrupt ini silently keeps the defaults.
+    const FontSpec title = FontSpec::Parse(settings_.title_font);
+    const FontSpec keyword = FontSpec::Parse(settings_.keyword_font);
+    const FontSpec list = FontSpec::Parse(settings_.list_font);
+
+    title_format_.Attach(d2d_.CreateFormat(
+        title.family, PointsToDip(title.size),
+        title.bold() ? DWRITE_FONT_WEIGHT_BOLD : DWRITE_FONT_WEIGHT_SEMI_BOLD));
+    query_format_.Attach(d2d_.CreateFormat(
+        keyword.family, PointsToDip(keyword.size),
+        keyword.bold() ? DWRITE_FONT_WEIGHT_BOLD : DWRITE_FONT_WEIGHT_NORMAL));
+    row_format_.Attach(d2d_.CreateFormat(
+        list.family, PointsToDip(list.size),
+        list.bold() ? DWRITE_FONT_WEIGHT_BOLD : DWRITE_FONT_WEIGHT_NORMAL));
+    row_bold_format_.Attach(d2d_.CreateFormat(
+        list.family, PointsToDip(list.size), DWRITE_FONT_WEIGHT_SEMI_BOLD));
+    mono_format_.Attach(d2d_.CreateFormat(
+        list.family, PointsToDip(list.size),
+        list.bold() ? DWRITE_FONT_WEIGHT_BOLD : DWRITE_FONT_WEIGHT_NORMAL));
+    // The footer/detail/hint line keeps the original 11 DIP size; only the
+    // family follows ListFont so every skin font is honoured.
+    hint_format_.Attach(
+        d2d_.CreateFormat(list.family, 11.0f, DWRITE_FONT_WEIGHT_NORMAL));
+}
+
+std::wstring MainWindow::SkinPath() const {
+    std::string name = settings_.bg_file_name;
+    if (name.empty()) {
+        name = "BG.jpg";  // original empty -> DEFAULT_BGFILENAME fallback
+    }
+    std::wstring wide = ToWide(name);
+    // Absolute paths are tolerated even though the spec says "relative to the
+    // executable" (the legacy dialog only ever wrote a file name).
+    if (wide.size() >= 2 && wide[1] == L':') {
+        return wide;
+    }
+    if (!wide.empty() && (wide.front() == L'\\' || wide.front() == L'/')) {
+        return wide;
+    }
+    return ShellIntegration::ExecutableDirectory() + wide;
+}
+
+void MainWindow::ReloadSkin() {
+    skin_.Release();
+
+    if (!settings_.show_skin) {
+        Logger::Instance().Trace("skin: disabled by ShowSkin=0");
+        return;
+    }
+    const std::wstring path = SkinPath();
+    if (::GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        // Missing skin is a normal state: keep the solid rounded background,
+        // never show an error dialog.
+        Logger::Instance().Info("skin: " + ToUtf8(path) +
+                                " not found, using solid background");
+        return;
+    }
+    if (d2d_.target() == nullptr || !skin_.Load(d2d_.target(), path)) {
+        return;
+    }
 }
 
 void MainWindow::UpdateWindowAlpha() {
@@ -174,6 +260,8 @@ void MainWindow::ShowLauncher() {
     caret_visible_ = true;
     ResetHideTimer();
     ::InvalidateRect(hwnd_, nullptr, FALSE);
+    // Original PlayPopupNotify: play <exe目录>\Popup.wav once per show.
+    ShellIntegration::PlayPopupSound(settings_.play_popup_notify);
 }
 
 void MainWindow::ResetHideTimer() {
@@ -290,6 +378,10 @@ void MainWindow::ShowRecentList() {
 }
 
 void MainWindow::ApplySettings() {
+    // Settings may have changed the skin, fonts, alpha or width: rebuild the
+    // render resources first (the old skin bitmap would be released).
+    CreateTextFormats();
+    ReloadSkin();
     UpdateWindowAlpha();
     Relayout();
     if (visible()) {
@@ -313,9 +405,13 @@ void MainWindow::OnPaint() {
     PAINTSTRUCT ps = {};
     ::BeginPaint(hwnd_, &ps);
 
-    if (d2d_.target() == nullptr && !d2d_.Initialize(hwnd_)) {
-        ::EndPaint(hwnd_, &ps);
-        return;
+    if (d2d_.target() == nullptr) {
+        if (!d2d_.Initialize(hwnd_)) {
+            ::EndPaint(hwnd_, &ps);
+            return;
+        }
+        // The ID2D1Bitmap belongs to the old device: decode the skin again.
+        ReloadSkin();
     }
     if (d2d_.BeginDraw()) {
         DrawFrame();
@@ -371,17 +467,33 @@ void MainWindow::DrawFrame() {
     const float width = static_cast<float>(settings_.form_width);
     const float height = ContentHeight();
     const float radius = static_cast<float>(std::max(0, settings_.round_border_radius));
+    const D2D1_RECT_F frame =
+        D2D1::RectF(0.5f, 0.5f, width - 0.5f, height - 0.5f);
 
-    d2d_.FillRoundedRect(D2D1::RectF(0.5f, 0.5f, width - 0.5f, height - 0.5f), radius,
-                         kBackground);
-    d2d_.DrawRoundedBorder(D2D1::RectF(0.5f, 0.5f, width - 0.5f, height - 0.5f), radius,
-                           kBorder, 1.0f);
+    if (skin_.valid()) {
+        // Cover-fit the skin (keep the aspect ratio, crop the overflow) and put
+        // a semi-transparent copy of the old panel on top for text legibility.
+        const D2D1_SIZE_F image = skin_.size();
+        if (image.width > 0.0f && image.height > 0.0f) {
+            const float scale = std::max(width / image.width, height / image.height);
+            const float draw_width = image.width * scale;
+            const float draw_height = image.height * scale;
+            d2d_.DrawBitmap(skin_.bitmap(),
+                            D2D1::RectF((width - draw_width) * 0.5f,
+                                        (height - draw_height) * 0.5f,
+                                        (width + draw_width) * 0.5f,
+                                        (height + draw_height) * 0.5f));
+        }
+        d2d_.FillRoundedRect(frame, radius, kPanelOverlay);
+    } else {
+        d2d_.FillRoundedRect(frame, radius, kBackground);
+    }
+    d2d_.DrawRoundedBorder(frame, radius, kBorder, 1.0f);
 
-    d2d_.DrawTextBlock(L"ALTRun", title_format_.Get(),
+    d2d_.DrawTextBlock(Loc("resTitle"), title_format_.Get(),
                        D2D1::RectF(kPad, kPad, width - kPad, kPad + kHeaderHeight),
                        kAccent);
-    const std::wstring count =
-        std::to_wstring(store_.item_count()) + L" items";
+    const std::wstring count = FormatCount(Loc("resItemCount"), store_.item_count());
     IDWriteTextFormat* right = title_format_.Get();
     right->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
     d2d_.DrawTextBlock(count, right,
@@ -393,8 +505,7 @@ void MainWindow::DrawFrame() {
     const D2D1_RECT_F input = InputRect();
     const std::wstring query_wide = ToWide(query_);
     if (query_wide.empty() && ime_composition_.empty()) {
-        d2d_.DrawTextBlock(L"输入关键字，Enter 运行，Esc 关闭", hint_format_.Get(), input,
-                           kTextDim);
+        d2d_.DrawTextBlock(Loc("resHintInput"), hint_format_.Get(), input, kTextDim);
     } else {
         d2d_.DrawTextBlock(query_wide, query_format_.Get(), input, kTextBright);
         if (caret_visible_) {
@@ -444,7 +555,7 @@ void MainWindow::DrawRows() {
 
     if (rows == 0) {
         const D2D1_RECT_F rect = RowRect(0);
-        d2d_.DrawTextBlock(L"没有匹配项", row_format_.Get(),
+        d2d_.DrawTextBlock(Loc("resNoMatch"), row_format_.Get(),
                            D2D1::RectF(rect.left + 10.0f, rect.top, rect.right,
                                        rect.bottom),
                            kTextDim);
@@ -472,8 +583,7 @@ void MainWindow::DrawFooter() {
     if (!settings_.show_operation_hint) {
         return;
     }
-    d2d_.DrawTextBlock(L"↑↓ 选择   Enter 运行   Esc 关闭   Ctrl+V 粘贴",
-                       hint_format_.Get(),
+    d2d_.DrawTextBlock(Loc("resHintOperation"), hint_format_.Get(),
                        D2D1::RectF(kPad + 4.0f, hint_top,
                                    static_cast<float>(settings_.form_width) - kPad,
                                    hint_top + kFooterHeight),
@@ -527,6 +637,9 @@ void MainWindow::ExecuteEntry(size_t entry_index, std::string param, bool count_
     const LaunchResult result = LaunchShortcut(item, param);
     if (!result.ok) {
         ::MessageBeep(MB_ICONWARNING);
+        // Original [Common] CanNotExecute; localized so EN/zh profiles differ.
+        ::MessageBoxW(hwnd_, Loc("resCannotExecute").c_str(),
+                      Loc("resTitle").c_str(), MB_OK | MB_ICONWARNING);
         return;
     }
 

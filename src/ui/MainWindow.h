@@ -15,6 +15,7 @@
 #include "core/ParamHistory.h"
 #include "core/ShortcutStore.h"
 #include "ui/D2DContext.h"
+#include "ui/SkinImage.h"
 #include "ui/Window.h"
 
 namespace alt {
@@ -63,6 +64,13 @@ private:
     float ContentHeight() const;
 
     // --- painting ---------------------------------------------------------
+    // (Re)creates the DirectWrite formats from Settings' font strings; also
+    // called by ApplySettings after the settings dialog wrote new fonts.
+    void CreateTextFormats();
+    // Loads/releases the skinned background for settings_.show_skin /
+    // settings_.bg_file_name (silent fallback when the file is missing).
+    void ReloadSkin();
+    std::wstring SkinPath() const;
     void DrawFrame();
     void DrawRows();
     void DrawFooter();
@@ -100,6 +108,7 @@ private:
     ParamHistory& param_history_;
 
     D2DContext d2d_;
+    SkinImage skin_;
     ComPtr<IDWriteTextFormat> title_format_;
     ComPtr<IDWriteTextFormat> query_format_;
     ComPtr<IDWriteTextFormat> row_format_;

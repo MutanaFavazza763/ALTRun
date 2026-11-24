@@ -11,6 +11,12 @@
 
 ![参数窗截图](docs/images/param.png)
 
+M5 外观与系统集成：
+
+| 皮肤背景 | 多语言 | 关于窗口 |
+|---|---|---|
+| ![皮肤背景](docs/images/launcher-skin.png) | ![多语言](docs/images/launcher-i18n.png) | ![关于](docs/images/about.png) |
+
 设置窗口（四个页签，热键按键捕获）：
 
 ![设置-常规](docs/images/config-general.png)
@@ -48,6 +54,8 @@
   `ParamHistory.txt`、`ALTRun.ini`（含 `[DEBUG] LatestList`）
 - 绿色便携：所有配置与数据都在 exe 同目录，不写注册表配置
 - 中文界面与 IME 输入、Win11 圆角暗色窗口
+- M5：JPG/PNG/BMP 皮肤、字体串解析、多语言 `.lang`、Popup.wav、SendTo 快捷方式、关于窗口
+- M6：116 项核心单元测试、CTest、GBK 兼容验证、可复现的 win64 便携版打包脚本
 
 ## 构建
 
@@ -68,7 +76,8 @@ cmake --build build/vs --config Release
 
 ## 文档
 
-- [使用说明](docs/USAGE.md)：热键、搜索语法、参数、最近列表、设置、数据文件与迁移
+- [使用说明](docs/USAGE.md)：热键、搜索语法、参数、最近列表、设置、管理器、数据文件与迁移
+- [发布包脚本](scripts/package.ps1)：一键构建并生成 win64 便携 ZIP
 - [架构设计](docs/ARCHITECTURE.md)：分层、数据模型、匹配/执行流程、刻意差异
 - [重写路线图](docs/ROADMAP.md)：M0–M6 里程碑与验收标准
 - 逆向规格（原 Delphi 行为，带源码行号）：
@@ -90,8 +99,8 @@ resources/ 运行时资源（皮肤、语言、图标，M5 使用）
 ## 状态
 
 里程碑 M0（规格）、M1（可运行骨架）、M2（参数窗 / 参数历史 / 最近列表）、
-M3（设置界面）、M4（快捷项管理器）完成；皮肤/多语言、单元测试与打包正在按
-[ROADMAP.md](docs/ROADMAP.md) 推进。
+M3（设置界面）、M4（快捷项管理器）、M5（外观/多语言/系统集成）、M6（测试/打包）均已完成；
+后续增强项见 [ROADMAP.md](docs/ROADMAP.md)。
 
 ## 许可
 
