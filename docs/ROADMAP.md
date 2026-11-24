@@ -43,14 +43,24 @@
 验收：`cmd /k %p` 弹出参数窗，输入参数后执行；参数写入 `ParamHistory.txt` 并出现在下次历史中；
 ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 
-## M3 — 设置界面（⏳）
+## M3 — 设置界面（✅）
 
-- [ ] 5 个可见 Tab（常规 / 外观 / 热键 / 列表 / 关于）+ 1 个隐藏 Tab
-- [ ] 50 个配置项全部可编辑并与 ini 双向同步
-- [ ] 热键捕获控件、冲突检测、即时生效
-- [ ] 托盘菜单与配置按钮入口
+- [x] 原生控件分页窗口 `ConfigWindow`（`SysTabControl32`，720×540，置顶、光标显示器居中）
+- [x] 四个页签：**常规** / **热键** / **外观** / **调试·关于**
+      （原版 5 个可见 Tab + 1 个隐藏 Tab，重写将列表/皮肤并入"外观"、调试并入"调试·关于"）
+- [x] 常规：13 个布尔项（Regex/MatchAnywhere/NumberKey/IndexFrom0to9/RememberFavouratMatch/
+      ShowTopTen/ExecuteIfOnlyOne/ExitWhenExecute/ShowCommandLine/ShowOperationHint/
+      AutoRun/AddToSendTo/ShowMeWhenStart）+ HideDelay、ParamHistoryLimit
+- [x] 热键：三个按键捕获框（`Alt + R` 风格文本、Delete 清空、Tab/Shift+Tab 切换焦点）
+- [x] 外观：FormWidth/Alpha/RoundBorderRadius、ListFormat 下拉（3 个预置 + 可编辑）、
+      Lang、BGFileName、ShowSkin/ShowTrayIcon/PlayPopupNotify/ShowStartNotification
+- [x] 调试·关于：版本、ini 路径、ShortCutRunCount、TraceEnable、相关数据文件路径说明
+- [x] 确定 = 写回 `Settings` → `settings_.Save()` → 回调 `App::ApplySettings()`
+      （重注册三个热键、应用自启动、刷新主窗透明度/尺寸/定时器）；取消/Esc 不写盘
+- [x] 托盘菜单"设置"打开；开发用 `--config` 直接打开
 
-验收：修改任一配置项后重启生效，ini 值与界面对应；旧 ini 载入无错。
+验收：`--config` 可打开并切换四个页签；修改后点"确定" ini 落盘且日志出现
+`config window: settings applied` / `settings applied`；取消不改变 ini。
 
 ## M4 — 快捷项管理（⏳）
 

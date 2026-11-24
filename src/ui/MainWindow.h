@@ -44,6 +44,9 @@ public:
     // Executes the most recently used item (LastItemHotKey, default ALT+L).
     void LaunchLatest();
 
+    // Applies changed settings (alpha, width, timers) to the live window.
+    void ApplySettings();
+
     void SetExitHandler(std::function<void()> handler);
 
 protected:

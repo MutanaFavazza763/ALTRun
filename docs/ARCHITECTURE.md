@@ -48,7 +48,8 @@ src/
    ├─ Window.{h,cpp}        无边框窗口基类 + 消息分发
    ├─ D2DContext.{h,cpp}    D2D/DWrite 资源封装（设备丢失重建）
    ├─ MainWindow.{h,cpp}    启动器窗口：输入、结果列表、绘制、键盘/IME
-   └─ ParamWindow.{h,cpp}   参数提示窗：单行编辑 + 历史下拉 + 空闲取消
+   ├─ ParamWindow.{h,cpp}   参数提示窗：单行编辑 + 历史下拉 + 空闲取消
+   └─ ConfigWindow.{h,cpp}  设置窗口：原生分页控件（4 页）+ 热键捕获
 ```
 
 依赖方向严格单向：`ui → app → core`，`core` 不包含 `<windows.h>` 之外的 UI 头文件，
@@ -159,7 +160,24 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | `'` | 执行显示编号 3 的项 |
 | `ExecuteIfOnlyOne=True` 且仅 1 条结果 | 立即执行（通过 `WM_APP+20` 延迟投递避免重入） |
 
-## 8. 窗口与交互
+## 8. 设置窗口
+
+`ConfigWindow` 用**原生控件**实现（`SysTabControl32` + `BUTTON`/`EDIT`/`COMBOBOX`/`STATIC`），
+而不是像启动器那样 D2D 自绘——设置界面控件多、交互原生（键盘 Tab、输入法、下拉），
+用系统控件最稳、代码量最小；外观与启动器暗色风格不同（后续 M5 可统一主题）。
+
+- 四个页签：**常规**（13 个布尔项 + HideDelay/ParamHistoryLimit）、**热键**（三个捕获框）、
+  **外观**（宽度/透明度/圆角/ListFormat 下拉/Lang/背景图/4 个显示开关）、
+  **调试·关于**（版本、ini 路径、ShortCutRunCount、TraceEnable、数据文件说明）。
+- 生命周期：`Open()` 每次从 `Settings` 重新载入；`确定` = 写回 → `settings_.Save()` →
+  `App::ApplySettings()`（重注册三个热键、`ApplyAutoRun`、日志开关、主窗刷新）→ 隐藏；
+  `取消`/`Esc`/`WM_CLOSE` 只隐藏，不写盘。
+- 热键捕获：聚焦后按下组合键即捕获，格式化为 `Ctrl + Alt + Shift + Win + 键` 文本，
+  Delete 清空（`HotKey2` 空 = 禁用）；不可表示的键（媒体键、小键盘）忽略。
+- 数值输入容错：非法/空输入回退原值；按控件语义夹紧范围（Alpha 0–255、圆角 0–200、
+  FormWidth 200–800、HideDelay 0–3600、ParamHistoryLimit 0–1000）。
+
+## 9. 窗口与交互
 
 - 无边框 `WS_POPUP` + `WS_EX_TOOLWINDOW | WS_EX_TOPMOST`；`DwmSetWindowAttribute`
   开启 Win11 圆角与深色模式；`Alpha<255` 时用 `WS_EX_LAYERED` + `SetLayeredWindowAttributes`。
@@ -174,7 +192,7 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 - 全局热键：`HotKey1`（默认 `Alt + R`）、`HotKey2`（默认 `Pause`，空则禁用）、
   `LastItemHotKey`（默认 `ALT+L`，当前仅唤起窗口，执行"最近项"待 M2）。
 
-## 9. 与原文的刻意差异
+## 10. 与原文的刻意差异
 
 | 编号 | 差异 | 原因 |
 |---|---|---|
@@ -190,8 +208,10 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | D10 | `ParamHistory.txt` 写 `rank\|param`，读取容忍旧格式的末尾 `%` | 原版格式串 `'%-10d\|%-30s%'` 的孤立 `%` 很可能让保存永远抛异常（规格 U2），直接照抄会让参数历史失效 |
 | D11 | 最近项热键走 `WM_HOTKEY` 直接执行，参数项先弹参数窗 | 原版同样先取参数再执行；这里把"唤起窗口"改为"直接执行"，符合热键语义 |
 | D12 | `ExecuteIfOnlyOne` 用 `WM_APP+20` 延迟投递执行 | 在结果列表重建过程中同步执行会重入 `RefreshMatches`/`HideLauncher` |
+| D13 | 设置窗口用原生控件 + 4 个合并页签（原版 5 Tab + 1 隐藏 Tab） | 原生控件交互可靠、代码量小；合并后覆盖同一批配置键，仅布局不同 |
+| D14 | 确定后**立即**应用热键/外观（原版部分项重启生效） | 更好的体验；`TraceEnable` 仍按原版提示"重启后生效" |
 
-## 10. 构建与运行
+## 11. 构建与运行
 
 ```powershell
 # 需要 Visual Studio（含 MSVC + Windows SDK）与 CMake ≥ 3.28
@@ -208,7 +228,7 @@ cmake --build build/vs --config Release
 运行后在 exe 目录生成：`ALTRun.ini`、`ShortCutList.txt`（+`.bak`）、
 `FavoriteList.txt`、`altRun.log`。
 
-## 11. 尚未实现（见 [ROADMAP.md](ROADMAP.md)）
+## 12. 尚未实现（见 [ROADMAP.md](ROADMAP.md)）
 
-设置界面（5 个 Tab / 50 键）、快捷项管理/编辑/导入导出、皮肤背景与字体解析、
-语言文件、`AddToSendTo`、单实例唤醒时复用已运行实例的窗口、单元测试与打包。
+快捷项管理/编辑/导入导出、皮肤背景与字体解析、语言文件、`AddToSendTo`、
+单实例唤醒时复用已运行实例的窗口、单元测试与打包。

@@ -289,6 +289,15 @@ void MainWindow::ShowRecentList() {
     ::InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
+void MainWindow::ApplySettings() {
+    UpdateWindowAlpha();
+    Relayout();
+    if (visible()) {
+        ResetHideTimer();
+    }
+    ::InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
 void MainWindow::LaunchLatest() {
     if (store_.latest().empty()) {
         Logger::Instance().Trace("no recent item to launch");

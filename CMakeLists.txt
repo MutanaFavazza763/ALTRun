@@ -27,6 +27,7 @@ set(ALTRUN_SOURCES
     src/core/Shortcut.cpp
     src/core/ShortcutStore.cpp
     src/core/Text.cpp
+    src/ui/ConfigWindow.cpp
     src/ui/D2DContext.cpp
     src/ui/MainWindow.cpp
     src/ui/ParamWindow.cpp
@@ -46,6 +47,7 @@ set(ALTRUN_HEADERS
     src/core/Shortcut.h
     src/core/ShortcutStore.h
     src/core/Text.h
+    src/ui/ConfigWindow.h
     src/ui/D2DContext.h
     src/ui/MainWindow.h
     src/ui/ParamWindow.h

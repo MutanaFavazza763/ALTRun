@@ -9,6 +9,7 @@
 #include "app/Settings.h"
 #include "core/ParamHistory.h"
 #include "core/ShortcutStore.h"
+#include "ui/ConfigWindow.h"
 #include "ui/MainWindow.h"
 
 namespace alt {
@@ -41,6 +42,9 @@ private:
     void ShowTrayMenu();
     void OnTrayCallback(LPARAM lparam);
     void ApplyAutoRun(bool enabled);
+    // Re-applies settings that need runtime action: hotkeys, auto-run, logging
+    // and the launcher window's alpha/size/timers.
+    void ApplySettings();
 
     LRESULT HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 
@@ -51,6 +55,7 @@ private:
     ShortcutStore store_;
     ParamHistory param_history_;
     MainWindow main_window_;
+    ConfigWindow config_window_;
     HotkeyRegistration hotkey_;
     HotkeyRegistration secondary_hotkey_;
     HotkeyRegistration last_item_hotkey_;

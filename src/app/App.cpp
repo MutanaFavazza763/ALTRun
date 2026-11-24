@@ -38,8 +38,12 @@ std::wstring ExePath() {
 }
 
 // Development convenience: `ALTRun.exe --show` opens the launcher immediately
-// so the UI can be inspected without pressing the hotkey.
-bool HasShowFlag() {
+// and `--config` opens the settings window, so the UI can be inspected without
+// pressing the hotkey or clicking the tray icon.
+bool HasFlag(const wchar_t* flag) {
+    if (flag == nullptr) {
+        return false;
+    }
     int argc = 0;
     LPWSTR* argv = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
     if (argv == nullptr) {
@@ -47,7 +51,7 @@ bool HasShowFlag() {
     }
     bool found = false;
     for (int i = 1; i < argc && !found; ++i) {
-        found = ::_wcsicmp(argv[i], L"--show") == 0;
+        found = ::_wcsicmp(argv[i], flag) == 0;
     }
     ::LocalFree(argv);
     return found;
@@ -57,7 +61,8 @@ bool HasShowFlag() {
 
 App::App(HINSTANCE instance)
     : instance_(instance),
-      main_window_(settings_, store_, param_history_) {}
+      main_window_(settings_, store_, param_history_),
+      config_window_(settings_) {}
 
 App::~App() {
     RemoveTrayIcon();
@@ -112,12 +117,24 @@ int App::Run() {
         last_item_hotkey_.Register(main_window_.hwnd(), kHotkeyIdLastItem, last_item);
     }
 
+    // Settings dialog: the tray menu opens it; OK re-applies hotkeys and the
+    // launcher window's appearance.
+    if (config_window_.CreateConfigWindow(instance_)) {
+        config_window_.SetApplyHandler([this]() { ApplySettings(); });
+    } else {
+        Logger::Instance().Warn("cannot create settings window");
+    }
+
     if (settings_.show_tray_icon) {
         AddTrayIcon();
     }
     ApplyAutoRun(settings_.auto_run);
 
-    if (settings_.show_me_when_start || HasShowFlag()) {
+    if (HasFlag(L"--config") && config_window_.hwnd() != nullptr) {
+        config_window_.Open();
+    }
+
+    if (settings_.show_me_when_start || HasFlag(L"--show")) {
         main_window_.ShowLauncher();
     }
 
@@ -194,9 +211,9 @@ LRESULT App::HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam,
                     main_window_.ShowLauncher();
                     return 0;
                 case kTrayMenuConfig:
-                    ::MessageBoxW(hwnd,
-                                  L"设置窗口尚未实现（见 docs/ROADMAP.md 里程碑 M3）",
-                                  L"ALTRun", MB_OK | MB_ICONINFORMATION);
+                    if (config_window_.hwnd() != nullptr) {
+                        config_window_.Open();
+                    }
                     return 0;
                 case kTrayMenuExit:
                     RequestExit();
@@ -274,6 +291,37 @@ void App::RemoveTrayIcon() {
         ::Shell_NotifyIconW(NIM_DELETE, &tray_icon_);
         tray_visible_ = false;
     }
+}
+
+void App::ApplySettings() {
+    // Hotkeys: re-register from the (already saved) settings.
+    hotkey_.Unregister();
+    secondary_hotkey_.Unregister();
+    last_item_hotkey_.Unregister();
+
+    const HotkeySpec toggle = ParseHotkey(settings_.hotkey1);
+    if (!toggle.valid() ||
+        !hotkey_.Register(main_window_.hwnd(), kHotkeyIdToggle, toggle)) {
+        Logger::Instance().Warn("cannot register hotkey " + settings_.hotkey1);
+    }
+    if (!settings_.hotkey2.empty() && settings_.hotkey2 != settings_.hotkey1) {
+        const HotkeySpec secondary = ParseHotkey(settings_.hotkey2);
+        if (secondary.valid() &&
+            !secondary_hotkey_.Register(main_window_.hwnd(), kHotkeyIdToggle2,
+                                        secondary)) {
+            Logger::Instance().Warn("cannot register hotkey " + settings_.hotkey2);
+        }
+    }
+    const HotkeySpec last_item = ParseHotkey(settings_.last_item_hotkey);
+    if (last_item.valid() &&
+        !last_item_hotkey_.Register(main_window_.hwnd(), kHotkeyIdLastItem, last_item)) {
+        Logger::Instance().Warn("cannot register hotkey " + settings_.last_item_hotkey);
+    }
+
+    Logger::Instance().SetEnabled(settings_.trace_enabled);
+    ApplyAutoRun(settings_.auto_run);
+    main_window_.ApplySettings();
+    Logger::Instance().Info("settings applied");
 }
 
 void App::ApplyAutoRun(bool enabled) {
