@@ -149,6 +149,9 @@ constexpr BuiltinText kRewriteBuiltins[] = {
      L"TraceEnable 修改后需重启 ALTRun 才会生效；日志写入 "
      L"%LOCALAPPDATA%\\ALTRun\\altRun.log。"},
     {"resLabelVersion", L"Version: ", L"版本："},
+    {"resCopyPath", L"Copy path", L"复制路径", L"複製路徑"},
+    {"resAdvancedHint", L"Changes take effect after you click Save.",
+     L"修改后点击“确定”保存生效。", L"修改後點擊「確定」儲存生效。"},
     // Shortcut manager: dialogs and buttons the legacy VCL form did not have.
     {"resKeyword", L"Keyword", L"关键字"},
     {"resMoveUp", L"Up", L"上移"},
@@ -157,8 +160,8 @@ constexpr BuiltinText kRewriteBuiltins[] = {
     {"resImport", L"Import…", L"导入…"},
     {"resManagerHint",
      L"Hint: drag a row to reorder; double-click to edit, Delete to remove, "
-     L"Insert to add, F2 to edit.",
-     L"提示：拖动行可调整顺序；双击行编辑，Delete 删除，Insert 新增，F2 编辑。"},
+     L"Insert to add, F2 to edit. Hover a cell for its full text.",
+     L"提示：拖动行可调整顺序；双击行编辑，Delete 删除，Insert 新增，F2 编辑。悬停单元格可查看完整内容。"},
     {"resBlankRow", L"(blank separator)", L"（空白分隔行）"},
     {"resSaveListFailed",
      L"Cannot save ShortCutList.txt; check write access to the program folder.",

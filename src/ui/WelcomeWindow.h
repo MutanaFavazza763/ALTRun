@@ -60,6 +60,7 @@ private:
     int dpi_ = USER_DEFAULT_SCREEN_DPI;
     HFONT font_ = nullptr;
     HFONT title_font_ = nullptr;
+    HFONT icon_font_ = nullptr;
     bool font_is_stock_ = false;
     HBRUSH background_brush_ = nullptr;
 

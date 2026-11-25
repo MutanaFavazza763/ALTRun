@@ -318,4 +318,6 @@ const char* const kLocalizationKeys[] = {
     "resWelcomeAutoRun",
     "resWelcomeSendTo",
     "resWelcomeStart",
+    "resCopyPath",
+    "resAdvancedHint",
 };

@@ -29,7 +29,7 @@ constexpr int kMargin = 24;
 constexpr int kContentWidth = kWindowWidth - 2 * kMargin;
 
 constexpr int kCardTop = 72;
-constexpr int kCardBottom = 436;
+constexpr int kCardBottom = 496;
 constexpr int kIntroY = 96;
 constexpr int kGuideY = 138;
 constexpr int kGuideHeight = 98;
@@ -41,8 +41,7 @@ constexpr int kNoteY = 396;
 constexpr int kNoteHeight = 48;
 constexpr int kButtonWidth = 160;
 constexpr int kButtonHeight = 36;
-constexpr int kButtonY = 456;
-constexpr int kFooterTop = 448;
+constexpr int kButtonY = 452;
 
 constexpr int kIdStart = IDOK;
 constexpr int kIdLanguage = 3001;
@@ -102,10 +101,17 @@ void WelcomeWindow::CreateFonts() {
         title_log.lfHeight = static_cast<LONG>(title_log.lfHeight * 1.45);
         title_log.lfWeight = FW_SEMIBOLD;
         title_font_ = ::CreateFontIndirectW(&title_log);
+        title_log.lfHeight = -::MulDiv(36, dpi_, USER_DEFAULT_SCREEN_DPI);
+        title_log.lfWeight = FW_NORMAL;
+        icon_font_ = ::CreateFontIndirectW(&title_log);
     }
 }
 
 void WelcomeWindow::DestroyResources() {
+    if (icon_font_ != nullptr) {
+        ::DeleteObject(icon_font_);
+        icon_font_ = nullptr;
+    }
     if (title_font_ != nullptr) {
         ::DeleteObject(title_font_);
         title_font_ = nullptr;
@@ -184,7 +190,7 @@ void WelcomeWindow::CreateControls() {
         true);
     if (start_button_ != nullptr) {
         ::SetWindowPos(start_button_, nullptr,
-                       S(kWindowWidth - kMargin - kButtonWidth), S(kButtonY), 0,
+                       S((kWindowWidth - kButtonWidth) / 2), S(kButtonY), 0,
                        0, SWP_NOSIZE | SWP_NOZORDER);
         ::SetWindowSubclass(start_button_, &WelcomeWindow::ChildSubclassProc, 2,
                             reinterpret_cast<DWORD_PTR>(this));
@@ -298,21 +304,17 @@ void WelcomeWindow::DrawHeader(HDC dc) const {
                  S(kCardBottom)};
     fluent::DrawCard(dc, card, S(14));
 
-    RECT footer = {S(kMargin), S(kFooterTop), S(kWindowWidth - kMargin),
-                   S(kFooterTop + 48)};
-    fluent::FillRounded(dc, footer, S(10), fluent::kSurface);
-    fluent::StrokeRounded(dc, footer, S(10), fluent::kBorder);
-
     // A small accent tile makes the first-run page feel like a welcome card
     // rather than a plain form.
-    RECT tile = {S(kMargin + 24), S(kCardTop + 24), S(kMargin + 56),
-                 S(kCardTop + 56)};
-    fluent::FillRounded(dc, tile, S(10), fluent::kAccentSoft);
+    RECT tile = {S(kMargin + 24), S(kCardTop + 24), S(kMargin + 64),
+                 S(kCardTop + 64)};
+    fluent::FillRounded(dc, tile, S(12), fluent::kAccentSoft);
     ::SetBkMode(dc, TRANSPARENT);
     ::SetTextColor(dc, fluent::kAccent);
-    HGDIOBJ old = ::SelectObject(dc, title_font_);
+    HGDIOBJ old = ::SelectObject(dc,
+                                 icon_font_ != nullptr ? icon_font_ : title_font_);
     RECT glyph = tile;
-    ::DrawTextW(dc, L"✦", -1, &glyph,
+    ::DrawTextW(dc, L"\u2726", -1, &glyph,
                 DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
     ::SelectObject(dc, old);
 }
@@ -336,8 +338,10 @@ void WelcomeWindow::ShowLanguageMenu() {
     POINT point = {button.left, button.bottom + 4};
     std::vector<fluent::MenuItem> items;
     for (int index = 0; index < 3; ++index) {
-        items.push_back({kIdLanguageFirst + index, kLanguageNames[index], L"",
-                         false, false, true});
+        std::wstring label = index == language_index_ ? L"\u2713  " : L"     ";
+        label += kLanguageNames[index];
+        items.push_back({kIdLanguageFirst + index, label, L"", false, false,
+                         true});
     }
     const int command = fluent::ShowPopupMenu(
         hwnd_, instance_, point, Loc("resWelcomeLanguage"), L"", nullptr, items);

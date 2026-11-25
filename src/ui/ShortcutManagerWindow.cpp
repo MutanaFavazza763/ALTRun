@@ -9,6 +9,7 @@
 #include <windowsx.h>
 
 #include <algorithm>
+#include <cwchar>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -31,10 +32,10 @@ constexpr int kWindowWidth = 980;
 constexpr int kWindowHeight = 640;
 constexpr int kHeaderHeight = 48;
 constexpr int kListX = 32;
-constexpr int kListY = 96;
+constexpr int kListY = 124;
 constexpr int kListWidth = 916;
-constexpr int kListHeight = 404;
-constexpr int kRowButtonWidth = 88;
+constexpr int kListHeight = 376;
+constexpr int kRowButtonWidth = 84;
 constexpr int kRowButtonHeight = 34;
 constexpr int kRowButtonY = 516;
 constexpr int kSmallButtonWidth = 84;
@@ -57,7 +58,7 @@ constexpr size_t kMaxImportFileSize = 32u * 1024u * 1024u;
 // legacy counterpart, so they keep rewrite keys.
 const char* const kColumnKeys[] = {"resKeyword", "Common.Name", "Common.ParamType",
                                    "Common.CommandLine"};
-constexpr int kColumnWidths[] = {150, 150, 110, 506};
+constexpr int kColumnWidths[] = {140, 140, 100, 526};
 
 std::wstring FilesystemPath(IShellItem* item) {
     if (item == nullptr) {
@@ -154,7 +155,7 @@ ShortcutManagerWindow::~ShortcutManagerWindow() {
 bool ShortcutManagerWindow::CreateManagerWindow(HINSTANCE instance) {
     INITCOMMONCONTROLSEX controls = {};
     controls.dwSize = static_cast<DWORD>(sizeof(controls));
-    controls.dwICC = ICC_LISTVIEW_CLASSES;
+    controls.dwICC = ICC_WIN95_CLASSES;
     ::InitCommonControlsEx(&controls);
 
     if (!Create(instance, kWindowClass,
@@ -209,6 +210,10 @@ void ShortcutManagerWindow::CreateFonts() {
 }
 
 void ShortcutManagerWindow::DestroyResources() {
+    if (tooltip_ != nullptr) {
+        ::DestroyWindow(tooltip_);
+        tooltip_ = nullptr;
+    }
     if (title_font_ != nullptr) {
         ::DeleteObject(title_font_);
         title_font_ = nullptr;
@@ -250,18 +255,21 @@ HWND ShortcutManagerWindow::MakeControl(const wchar_t* class_name,
 
 void ShortcutManagerWindow::CreateControls() {
     list_ = MakeControl(WC_LISTVIEWW, L"",
-                        WS_CHILD | WS_VISIBLE | WS_TABSTOP |
-                            LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS,
+                        WS_CHILD | WS_VISIBLE | WS_TABSTOP | LVS_REPORT |
+                            LVS_SINGLESEL | LVS_SHOWSELALWAYS |
+                            LVS_OWNERDRAWFIXED | LVS_NOCOLUMNHEADER,
                         kListX, kListY, kListWidth, kListHeight, kIdList);
     if (list_ != nullptr) {
         ListView_SetExtendedListViewStyle(
-            list_, LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP | LVS_EX_DOUBLEBUFFER);
+            list_, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
         // Explorer's list-view theme is the closest native control to the
         // WinUI ListView: flat header, soft row hover and an accent selection
         // bar instead of the classic 3D report grid.
         ::SetWindowTheme(list_, L"Explorer", nullptr);
         if (HWND header = ListView_GetHeader(list_)) {
             ::SetWindowTheme(header, L"Explorer", nullptr);
+            ::SendMessageW(header, WM_SETFONT,
+                           reinterpret_cast<WPARAM>(font_), TRUE);
         }
         ListView_SetBkColor(list_, fluent::kSurface);
         ListView_SetTextBkColor(list_, fluent::kSurface);
@@ -296,17 +304,17 @@ void ShortcutManagerWindow::CreateControls() {
     };
 
     add_button_ = make_button(kIdAdd, Loc("Common.BtnAdd"), 32, kRowButtonY,
-                              kRowButtonWidth, kRowButtonHeight, false);
-    edit_button_ = make_button(kIdEdit, Loc("Common.BtnEdit"), 128,
+                              kRowButtonWidth, kRowButtonHeight, true);
+    edit_button_ = make_button(kIdEdit, Loc("Common.BtnEdit"), 124,
                                kRowButtonY, kRowButtonWidth, kRowButtonHeight,
                                false);
-    delete_button_ = make_button(kIdDelete, Loc("Common.BtnDelete"), 224,
+    delete_button_ = make_button(kIdDelete, Loc("Common.BtnDelete"), 216,
                                  kRowButtonY, kRowButtonWidth, kRowButtonHeight,
                                  false);
-    up_button_ = make_button(kIdUp, Loc("resMoveUp"), 320, kRowButtonY,
-                             kRowButtonWidth, kRowButtonHeight, false);
-    down_button_ = make_button(kIdDown, Loc("resMoveDown"), 416, kRowButtonY,
-                               kRowButtonWidth, kRowButtonHeight, false);
+    up_button_ = make_button(kIdUp, L"\u2191", 324, kRowButtonY, 34,
+                             kRowButtonHeight, false);
+    down_button_ = make_button(kIdDown, L"\u2193", 362, kRowButtonY, 34,
+                               kRowButtonHeight, false);
 
     export_button_ = make_button(kIdExport, Loc("resExport"), 656, kRowButtonY,
                                  kSmallButtonWidth, kSmallButtonHeight, false);
@@ -314,6 +322,34 @@ void ShortcutManagerWindow::CreateControls() {
                                  kSmallButtonWidth, kSmallButtonHeight, false);
     ok_button_ = make_button(kIdOk, Loc("Common.BtnOK"), 852, kRowButtonY, 96,
                              kRowButtonHeight, true);
+
+    tooltip_ = ::CreateWindowExW(
+        WS_EX_TOPMOST, TOOLTIPS_CLASSW, nullptr,
+        WS_POPUP | TTS_ALWAYSTIP | TTS_NOPREFIX, 0, 0, 0, 0, hwnd_, nullptr,
+        instance_, nullptr);
+    if (tooltip_ != nullptr) {
+        ::SetWindowPos(tooltip_, HWND_TOPMOST, 0, 0, 0, 0,
+                       SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        ::SendMessageW(tooltip_, TTM_SETMAXTIPWIDTH, 0, S(900));
+        up_tip_ = Loc("resMoveUp");
+        down_tip_ = Loc("resMoveDown");
+        TOOLINFOW tool = {};
+        tool.cbSize = sizeof(tool);
+        tool.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
+        tool.hwnd = hwnd_;
+        tool.uId = reinterpret_cast<UINT_PTR>(up_button_);
+        tool.lpszText = const_cast<LPWSTR>(up_tip_.c_str());
+        ::SendMessageW(tooltip_, TTM_ADDTOOLW, 0,
+                       reinterpret_cast<LPARAM>(&tool));
+        tool.uId = reinterpret_cast<UINT_PTR>(down_button_);
+        tool.lpszText = const_cast<LPWSTR>(down_tip_.c_str());
+        ::SendMessageW(tooltip_, TTM_ADDTOOLW, 0,
+                       reinterpret_cast<LPARAM>(&tool));
+        tool.uId = reinterpret_cast<UINT_PTR>(list_);
+        tool.lpszText = const_cast<LPWSTR>(LPSTR_TEXTCALLBACKW);
+        ::SendMessageW(tooltip_, TTM_ADDTOOLW, 0,
+                       reinterpret_cast<LPARAM>(&tool));
+    }
 
     hint_label_ = MakeControl(
         WC_STATICW, Loc("resManagerHint"),
@@ -902,6 +938,57 @@ void ShortcutManagerWindow::MoveFocus(bool backwards) {
     ::SetFocus(candidates[next]);
 }
 
+void ShortcutManagerWindow::DrawListItem(const DRAWITEMSTRUCT& item) {
+    if (item.hDC == nullptr || item.itemID == static_cast<UINT>(-1)) {
+        return;
+    }
+    const auto& entries = store_.entries();
+    if (item.itemID >= entries.size()) {
+        return;
+    }
+    const ShortcutEntry& entry = entries[item.itemID];
+    const bool selected = (item.itemState & ODS_SELECTED) != 0;
+    const COLORREF background = selected ? fluent::kSelection : fluent::kSurface;
+
+    HBRUSH brush = ::CreateSolidBrush(background);
+    ::FillRect(item.hDC, &item.rcItem, brush);
+    ::DeleteObject(brush);
+    if (selected) {
+        RECT stripe = {item.rcItem.left, item.rcItem.top, item.rcItem.left + 3,
+                       item.rcItem.bottom};
+        HBRUSH stripe_brush = ::CreateSolidBrush(fluent::kAccent);
+        ::FillRect(item.hDC, &stripe, stripe_brush);
+        ::DeleteObject(stripe_brush);
+    }
+    RECT divider = {item.rcItem.left, item.rcItem.bottom - 1,
+                    item.rcItem.right, item.rcItem.bottom};
+    HBRUSH divider_brush = ::CreateSolidBrush(fluent::kDivider);
+    ::FillRect(item.hDC, &divider, divider_brush);
+    ::DeleteObject(divider_brush);
+
+    const std::wstring values[4] = {
+        entry.is_blank ? L"\u2014" : ToWide(entry.item.keyword),
+        entry.is_blank ? Loc("resBlankRow") : ToWide(entry.item.name),
+        entry.is_blank ? std::wstring() : ParamTypeLabel(entry.item.param_type),
+        entry.is_blank ? std::wstring() : ToWide(entry.item.command_line)};
+
+    ::SetBkMode(item.hDC, TRANSPARENT);
+    ::SetTextColor(item.hDC, entry.is_blank ? fluent::kTextSecondary
+                                            : fluent::kText);
+    HGDIOBJ old_font = ::SelectObject(item.hDC, font_);
+    int left = item.rcItem.left;
+    for (int index = 0; index < 4; ++index) {
+        const int width = S(kColumnWidths[index]);
+        RECT cell = {left + S(7), item.rcItem.top, left + width - S(7),
+                     item.rcItem.bottom};
+        ::DrawTextW(item.hDC, values[index].c_str(), -1, &cell,
+                    DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS |
+                        DT_NOPREFIX);
+        left += width;
+    }
+    ::SelectObject(item.hDC, old_font);
+}
+
 void ShortcutManagerWindow::DrawHeader(HDC dc) const {
     if (font_ == nullptr || title_font_ == nullptr) {
         return;
@@ -913,6 +1000,38 @@ void ShortcutManagerWindow::DrawHeader(HDC dc) const {
                          title_font_, S(kHeaderHeight));
     fluent::DrawCard(dc,
                      RECT{S(16), S(64), S(kWindowWidth - 16), S(632)}, S(14));
+
+    RECT header = {S(kListX), S(kListY - 28), S(kListX + kListWidth),
+                   S(kListY)};
+    HBRUSH header_brush = ::CreateSolidBrush(fluent::kSurfaceAlt);
+    ::FillRect(dc, &header, header_brush);
+    ::DeleteObject(header_brush);
+    RECT header_line = {header.left, header.bottom - 1, header.right,
+                        header.bottom};
+    HBRUSH header_line_brush = ::CreateSolidBrush(fluent::kDivider);
+    ::FillRect(dc, &header_line, header_line_brush);
+    ::DeleteObject(header_line_brush);
+
+    ::SetBkMode(dc, TRANSPARENT);
+    ::SetTextColor(dc, fluent::kTextSecondary);
+    HGDIOBJ old_header_font = ::SelectObject(dc, title_font_);
+    int header_left = header.left;
+    for (int index = 0; index < 4; ++index) {
+        const int width = S(kColumnWidths[index]);
+        RECT cell = {header_left + S(7), header.top,
+                     header_left + width - S(7), header.bottom};
+        const std::wstring title = Loc(kColumnKeys[index]);
+        ::DrawTextW(dc, title.c_str(), -1, &cell,
+                    DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS |
+                        DT_NOPREFIX);
+        header_left += width;
+    }
+    ::SelectObject(dc, old_header_font);
+
+    RECT hint_band = {S(24), S(kHintY - 9), S(kWindowWidth - 24),
+                      S(kHintY + kSmallButtonHeight + 9)};
+    fluent::FillRounded(dc, hint_band, S(8), fluent::kSurfaceAlt);
+    fluent::StrokeRounded(dc, hint_band, S(8), fluent::kDivider);
 }
 
 void ShortcutManagerWindow::OnPaint() {
@@ -936,6 +1055,22 @@ LRESULT ShortcutManagerWindow::HandleMessage(UINT message, WPARAM wparam,
     }
 
     switch (message) {
+        case WM_MEASUREITEM: {
+            auto* measure = reinterpret_cast<MEASUREITEMSTRUCT*>(lparam);
+            if (measure != nullptr && measure->CtlType == ODT_LISTVIEW) {
+                measure->itemHeight = static_cast<UINT>(S(30));
+                return TRUE;
+            }
+            break;
+        }
+        case WM_DRAWITEM: {
+            auto* draw = reinterpret_cast<DRAWITEMSTRUCT*>(lparam);
+            if (draw != nullptr && draw->CtlType == ODT_LISTVIEW) {
+                DrawListItem(*draw);
+                return TRUE;
+            }
+            break;
+        }
         case WM_COMMAND: {
             if (HIWORD(wparam) != BN_CLICKED) {
                 return 0;
@@ -971,6 +1106,44 @@ LRESULT ShortcutManagerWindow::HandleMessage(UINT message, WPARAM wparam,
         }
         case WM_NOTIFY: {
             const NMHDR* header = reinterpret_cast<const NMHDR*>(lparam);
+            if (header != nullptr && header->hwndFrom == tooltip_) {
+                if (header->code == TTN_GETDISPINFOW) {
+                    auto* info = reinterpret_cast<NMTTDISPINFOW*>(lparam);
+                    POINT cursor = {};
+                    ::GetCursorPos(&cursor);
+                    ::ScreenToClient(list_, &cursor);
+                    LVHITTESTINFO hit = {};
+                    hit.pt = cursor;
+                    ListView_SubItemHitTest(list_, &hit);
+                    if (hit.iItem >= 0 && hit.iSubItem >= 0) {
+                        const auto& entries = store_.entries();
+                        const size_t row = static_cast<size_t>(hit.iItem);
+                        if (row < entries.size() && !entries[row].is_blank) {
+                            const ShortcutEntry& entry = entries[row];
+                            switch (hit.iSubItem) {
+                                case 0:
+                                    list_tip_text_ =
+                                        ToWide(entry.item.keyword);
+                                    break;
+                                case 1:
+                                    list_tip_text_ = ToWide(entry.item.name);
+                                    break;
+                                case 2:
+                                    list_tip_text_ =
+                                        ParamTypeLabel(entry.item.param_type);
+                                    break;
+                                default:
+                                    list_tip_text_ =
+                                        ToWide(entry.item.command_line);
+                                    break;
+                            }
+                            info->lpszText =
+                                const_cast<LPWSTR>(list_tip_text_.c_str());
+                        }
+                    }
+                }
+                return 0;
+            }
             if (header == nullptr || header->hwndFrom != list_) {
                 break;
             }
@@ -986,6 +1159,22 @@ LRESULT ShortcutManagerWindow::HandleMessage(UINT message, WPARAM wparam,
                         reinterpret_cast<const NMITEMACTIVATE*>(lparam);
                     if (info->iItem >= 0) {
                         EditSelected();
+                    }
+                    return 0;
+                }
+                case LVN_GETINFOTIP: {
+                    auto* info = reinterpret_cast<NMLVGETINFOTIP*>(lparam);
+                    if (info != nullptr && info->iSubItem == 3 &&
+                        info->iItem >= 0 && info->cchTextMax > 0) {
+                        const auto& entries = store_.entries();
+                        const size_t row = static_cast<size_t>(info->iItem);
+                        if (row < entries.size() && !entries[row].is_blank) {
+                            const std::wstring command =
+                                ToWide(entries[row].item.command_line);
+                            wcsncpy_s(info->pszText,
+                                      static_cast<size_t>(info->cchTextMax),
+                                      command.c_str(), _TRUNCATE);
+                        }
                     }
                     return 0;
                 }

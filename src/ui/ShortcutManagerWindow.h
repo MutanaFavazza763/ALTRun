@@ -52,6 +52,7 @@ private:
     void ApplyFont(HWND control) const;
     void PlaceOnCursorMonitor();
     void DrawHeader(HDC dc) const;
+    void DrawListItem(const DRAWITEMSTRUCT& item);
 
     // --- list model -------------------------------------------------------
     void ReloadList(int select_row = -1);
@@ -106,6 +107,10 @@ private:
     HFONT title_font_ = nullptr;
     bool font_is_stock_ = false;
     HBRUSH background_brush_ = nullptr;
+    HWND tooltip_ = nullptr;
+    std::wstring up_tip_;
+    std::wstring down_tip_;
+    std::wstring list_tip_text_;
 
     HWND list_ = nullptr;
     HWND add_button_ = nullptr;

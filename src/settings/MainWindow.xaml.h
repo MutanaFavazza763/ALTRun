@@ -14,12 +14,19 @@ struct MainWindow : MainWindowT<MainWindow> {
                        Microsoft::UI::Xaml::RoutedEventArgs const&);
     void OnHotkeyKeyDown(winrt::Windows::Foundation::IInspectable const&,
                          Microsoft::UI::Xaml::Input::KeyRoutedEventArgs const&);
+    void OnLanguageItemClick(winrt::Windows::Foundation::IInspectable const&,
+                             Microsoft::UI::Xaml::RoutedEventArgs const&);
+    void OnCopyPathClick(winrt::Windows::Foundation::IInspectable const&,
+                         Microsoft::UI::Xaml::RoutedEventArgs const&);
 
 private:
     alt::Settings settings_;
+    int language_index_ = 2;
+    std::string language_value_ = "en_us";
     void LoadSettings();
     void SaveSettings();
     void ApplyLocalization();
+    void UpdateLanguageButton();
     void ShowPage(std::wstring const& tag);
     void NotifyMainApp();
 };

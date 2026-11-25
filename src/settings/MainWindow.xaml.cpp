@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <string>
 
+#include <winrt/Windows.ApplicationModel.DataTransfer.h>
+
 #include "core/Localization.h"
 #include "core/Logger.h"
 #include "core/Text.h"
@@ -28,8 +30,8 @@ hstring H(char const* key) {
     return hstring(W(key));
 }
 
-void SetToggleHeader(ToggleSwitch const& toggle, char const* key) {
-    toggle.Header(box_value(H(key)));
+void SetToggleLabel(TextBlock const& label, char const* key) {
+    label.Text(H(key));
 }
 
 void SetNumberHeader(NumberBox const& box, char const* key) {
@@ -108,6 +110,9 @@ std::string U8(hstring const& value) {
     return alt::ToUtf8(std::wstring(value));
 }
 
+const wchar_t* const kLanguageNames[3] = {L"简体中文", L"繁體中文", L"English"};
+const char* const kLanguageValues[3] = {"zh_cn", "zh_hk", "en_us"};
+
 }  // namespace
 
 MainWindow::MainWindow() {
@@ -123,13 +128,13 @@ MainWindow::MainWindow() {
         // still gives a usable Fluent surface.
     }
 
-    AppWindow().Resize({1000, 720});
+    AppWindow().Resize({1080, 760});
     try {
         auto area = winrt::Microsoft::UI::Windowing::DisplayArea::GetFromWindowId(
             AppWindow().Id(), winrt::Microsoft::UI::Windowing::DisplayAreaFallback::Primary);
         auto work = area.WorkArea();
-        AppWindow().Move({work.X + (work.Width - 1000) / 2,
-                          work.Y + (work.Height - 720) / 2});
+        AppWindow().Move({work.X + (work.Width - 1080) / 2,
+                          work.Y + (work.Height - 760) / 2});
     } catch (...) {
     }
 
@@ -174,27 +179,28 @@ void MainWindow::ApplyLocalization() {
 
     GeneralSearchTitle().Text(H("resFluentSettingsSearch"));
     GeneralSearchHint().Text(H("resSearchPageHint"));
+    GeneralStartupTitle().Text(H("resFluentSettingsStartup"));
     GeneralAdvancedTitle().Text(H("resFluentSettingsAdvanced"));
 
-    SetToggleHeader(GeneralRegex(), "ConfigForm.ConfigList_2");
-    SetToggleHeader(GeneralMatchAnywhere(), "ConfigForm.ConfigList_3");
-    SetToggleHeader(GeneralNumberKey(), "ConfigForm.ConfigList_4");
-    SetToggleHeader(GeneralIndexFrom0(), "ConfigForm.ConfigList_5");
-    SetToggleHeader(GeneralRememberFavourite(), "ConfigForm.ConfigList_6");
-    SetToggleHeader(GeneralShowTopTen(), "ConfigForm.ConfigList_10");
-    SetToggleHeader(GeneralExecuteIfOnlyOne(), "ConfigForm.ConfigList_19");
-    SetToggleHeader(GeneralExitWhenExecute(), "ConfigForm.ConfigList_12");
-    SetToggleHeader(GeneralShowCommandLine(), "ConfigForm.ConfigList_8");
-    SetToggleHeader(GeneralShowOperationHint(), "ConfigForm.ConfigList_7");
-    SetToggleHeader(GeneralAutoRun(), "ConfigForm.ConfigList_0");
-    SetToggleHeader(GeneralAddToSendTo(), "ConfigForm.ConfigList_1");
-    SetToggleHeader(GeneralShowMeWhenStart(), "ConfigForm.ConfigList_14");
+    SetToggleLabel(GeneralRegexLabel(), "ConfigForm.ConfigList_2");
+    SetToggleLabel(GeneralMatchAnywhereLabel(), "ConfigForm.ConfigList_3");
+    SetToggleLabel(GeneralNumberKeyLabel(), "ConfigForm.ConfigList_4");
+    SetToggleLabel(GeneralIndexFrom0Label(), "ConfigForm.ConfigList_5");
+    SetToggleLabel(GeneralRememberFavouriteLabel(), "ConfigForm.ConfigList_6");
+    SetToggleLabel(GeneralShowTopTenLabel(), "ConfigForm.ConfigList_10");
+    SetToggleLabel(GeneralExecuteIfOnlyOneLabel(), "ConfigForm.ConfigList_19");
+    SetToggleLabel(GeneralExitWhenExecuteLabel(), "ConfigForm.ConfigList_12");
+    SetToggleLabel(GeneralShowCommandLineLabel(), "ConfigForm.ConfigList_8");
+    SetToggleLabel(GeneralShowOperationHintLabel(), "ConfigForm.ConfigList_7");
+    SetToggleLabel(GeneralAutoRunLabel(), "ConfigForm.ConfigList_0");
+    SetToggleLabel(GeneralAddToSendToLabel(), "ConfigForm.ConfigList_1");
+    SetToggleLabel(GeneralShowMeWhenStartLabel(), "ConfigForm.ConfigList_14");
 
     SetNumberHeader(GeneralHideDelay(), "resHideDelay");
     GeneralHideDelayHint().Text(H("resHideDelayHint"));
     SetNumberHeader(GeneralParamHistoryLimit(), "resParamHistoryLimit");
     GeneralParamHistoryHint().Text(H("resParamHistoryLimitHint"));
-    GeneralHint().Text(H("resFluentSettingsAdvanced"));
+    GeneralHint().Text(H("resAdvancedHint"));
 
     HotkeyCardTitle().Text(H("resFluentSettingsHotkeys"));
     SetTextHeader(Hotkey1Box(), "ConfigForm.LblHotKey1");
@@ -211,23 +217,33 @@ void MainWindow::ApplyLocalization() {
     SetNumberHeader(FormWidthBox(), "ConfigForm.lblFormWidth");
     SetNumberHeader(AlphaBox(), "ConfigForm.LblFormAlpha");
     SetNumberHeader(RadiusBox(), "ConfigForm.lblRoundBorderRadius");
-    LanguageCombo().Header(box_value(H("ConfigForm.LblLanguage")));
+    LanguageLabel().Text(H("ConfigForm.LblLanguage"));
+    UpdateLanguageButton();
     SetTextHeader(BackgroundBox(), "ConfigForm.LblBackGroundImage");
 
     DisplayCardTitle().Text(H("resFluentSettingsDisplay"));
     SetTextHeader(ListFormatBox(), "resListFormat");
     ListFormatHint().Text(H("resListFormatHint"));
     OptionsCardTitle().Text(H("resFluentSettingsOptions"));
-    SetToggleHeader(ShowSkinToggle(), "ConfigForm.ConfigList_13");
-    SetToggleHeader(ShowTrayIconToggle(), "ConfigForm.ConfigList_15");
-    SetToggleHeader(PlayPopupNotifyToggle(), "ConfigForm.ConfigList_11");
-    SetToggleHeader(ShowStartNotificationToggle(), "ConfigForm.ConfigList_9");
-    AppearanceHint().Text(H("resAppearanceHint"));
+    SetToggleLabel(ShowSkinToggleLabel(), "ConfigForm.ConfigList_13");
+    SetToggleLabel(ShowTrayIconToggleLabel(), "ConfigForm.ConfigList_15");
+    SetToggleLabel(PlayPopupNotifyToggleLabel(), "ConfigForm.ConfigList_11");
+    SetToggleLabel(ShowStartNotificationToggleLabel(), "ConfigForm.ConfigList_9");
 
     AboutCardTitle().Text(H("resAboutCardTitle"));
-    AboutTrace().Header(box_value(H("resTraceEnable")));
+    AboutTraceLabel().Text(H("resTraceEnable"));
+    AboutIniPathLabel().Text(H("resAboutIniPath"));
+    AboutParamHistoryLabel().Text(H("resParamHistoryFile"));
+    AboutShortcutListLabel().Text(H("resShortcutListFile"));
+    AboutFavouriteListLabel().Text(H("resFavoriteListFile"));
     AboutRelatedFilesTitle().Text(H("resRelatedFiles"));
     AboutHint().Text(H("resTraceEnableHint"));
+
+    const hstring copy_tip = H("resCopyPath");
+    ToolTipService::SetToolTip(CopyIniButton(), box_value(copy_tip));
+    ToolTipService::SetToolTip(CopyParamHistoryButton(), box_value(copy_tip));
+    ToolTipService::SetToolTip(CopyShortcutListButton(), box_value(copy_tip));
+    ToolTipService::SetToolTip(CopyFavouriteButton(), box_value(copy_tip));
 
     CancelButton().Content(box_value(H("Common.BtnCancel")));
     SaveButton().Content(box_value(H("Common.BtnOK")));
@@ -280,39 +296,50 @@ void MainWindow::LoadSettings() {
     int language_index = 2;
     const std::string normalized =
         alt::Localization::NormalizeLanguage(settings_.lang);
-    int item_index = 0;
-    for (auto const& item : LanguageCombo().Items()) {
-        auto combo_item = item.try_as<ComboBoxItem>();
-        if (!combo_item) {
-            ++item_index;
-            continue;
-        }
-        auto tag = combo_item.Tag();
-        if (tag && winrt::unbox_value<hstring>(tag) == hstring(alt::ToWide(normalized))) {
-            language_index = item_index;
-            break;
-        }
-        ++item_index;
+    if (normalized == "zh_cn") {
+        language_index = 0;
+    } else if (normalized == "zh_hk") {
+        language_index = 1;
     }
-    LanguageCombo().SelectedIndex(language_index);
+    language_index_ = language_index;
+    language_value_ = normalized;
+    UpdateLanguageButton();
 
     AboutVersion().Text(hstring(std::wstring(L"2.1.0")));
-    AboutIniPath().Text(hstring(W("resAboutIniPath") + settings_.ini_path));
+    const std::wstring ini_path = settings_.ini_path.empty()
+                                     ? ExeDirectory() + L"ALTRun.ini"
+                                     : settings_.ini_path;
+    AboutIniPath().Text(hstring(ini_path));
+    ToolTipService::SetToolTip(AboutIniPath(), box_value(hstring(ini_path)));
+    CopyIniButton().Tag(box_value(hstring(ini_path)));
     AboutRunCount().Text(hstring(alt::LocArgInt(
         W("resAboutRunCount"), settings_.shortcut_run_count)));
 
     const std::wstring dir = settings_.ini_path.empty()
                                  ? ExeDirectory()
                                  : DirectoryOf(settings_.ini_path);
-    AboutParamHistory().Text(hstring(W("resParamHistoryFile") +
-                                      (dir.empty() ? ExeDirectory() : dir) +
-                                      L"ParamHistory.txt"));
-    AboutShortcutList().Text(hstring(W("resShortcutListFile") +
-                                     (dir.empty() ? ExeDirectory() : dir) +
-                                     L"ShortCutList.txt"));
-    AboutFavouriteList().Text(hstring(W("resFavoriteListFile") +
-                                      (dir.empty() ? ExeDirectory() : dir) +
-                                      L"FavoriteList.txt"));
+    const std::wstring param_history =
+        (dir.empty() ? ExeDirectory() : dir) + L"ParamHistory.txt";
+    const std::wstring shortcut_list =
+        (dir.empty() ? ExeDirectory() : dir) + L"ShortCutList.txt";
+    const std::wstring favourite_list =
+        (dir.empty() ? ExeDirectory() : dir) + L"FavoriteList.txt";
+
+    AboutParamHistory().Text(hstring(param_history));
+    ToolTipService::SetToolTip(AboutParamHistory(),
+                               box_value(hstring(param_history)));
+    CopyParamHistoryButton().Tag(box_value(hstring(param_history)));
+
+    AboutShortcutList().Text(hstring(shortcut_list));
+    ToolTipService::SetToolTip(AboutShortcutList(),
+                               box_value(hstring(shortcut_list)));
+    CopyShortcutListButton().Tag(box_value(hstring(shortcut_list)));
+
+    AboutFavouriteList().Text(hstring(favourite_list));
+    ToolTipService::SetToolTip(AboutFavouriteList(),
+                               box_value(hstring(favourite_list)));
+    CopyFavouriteButton().Tag(box_value(hstring(favourite_list)));
+
     AboutTrace().IsOn(settings_.trace_enabled);
 }
 
@@ -355,11 +382,8 @@ void MainWindow::SaveSettings() {
     settings_.play_popup_notify = PlayPopupNotifyToggle().IsOn();
     settings_.show_start_notification = ShowStartNotificationToggle().IsOn();
 
-    if (auto item = LanguageCombo().SelectedItem().try_as<ComboBoxItem>()) {
-        if (auto tag = item.Tag()) {
-            settings_.lang = alt::Localization::NormalizeLanguage(
-                winrt::to_string(winrt::unbox_value<hstring>(tag)));
-        }
+    if (!language_value_.empty()) {
+        settings_.lang = alt::Localization::NormalizeLanguage(language_value_);
     }
 
     settings_.trace_enabled = AboutTrace().IsOn();
@@ -375,6 +399,52 @@ void MainWindow::NotifyMainApp() {
     if (HWND main = ::FindWindowW(L"ALTRun.MainWindow.v2", nullptr)) {
         ::PostMessageW(main, WM_APP + 30, 0, 0);
     }
+}
+
+void MainWindow::UpdateLanguageButton() {
+    if (!LanguageButtonText()) {
+        return;
+    }
+    const int index = std::clamp(language_index_, 0, 2);
+    LanguageButtonText().Text(hstring(kLanguageNames[index]));
+}
+
+void MainWindow::OnLanguageItemClick(
+    IInspectable const& sender, RoutedEventArgs const&) {
+    auto item = sender.try_as<MenuFlyoutItem>();
+    if (!item) {
+        return;
+    }
+    auto tag = item.Tag();
+    if (!tag) {
+        return;
+    }
+    const std::string value =
+        winrt::to_string(winrt::unbox_value<hstring>(tag));
+    for (int index = 0; index < 3; ++index) {
+        if (value == kLanguageValues[index]) {
+            language_index_ = index;
+            language_value_ = value;
+            UpdateLanguageButton();
+            break;
+        }
+    }
+}
+
+void MainWindow::OnCopyPathClick(
+    IInspectable const& sender, RoutedEventArgs const&) {
+    auto button = sender.try_as<Button>();
+    if (!button) {
+        return;
+    }
+    auto tag = button.Tag();
+    if (!tag) {
+        return;
+    }
+    const hstring path = winrt::unbox_value<hstring>(tag);
+    winrt::Windows::ApplicationModel::DataTransfer::DataPackage package;
+    package.SetText(path);
+    winrt::Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
 }
 
 void MainWindow::ShowPage(std::wstring const& tag) {

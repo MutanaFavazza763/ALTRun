@@ -689,7 +689,7 @@ void DrawButton(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
                 bool primary, bool hover, bool pressed, bool focused,
                 bool enabled) {
     const COLORREF fill =
-        !enabled ? RGB(242, 244, 247)
+        !enabled ? RGB(245, 247, 250)
                  : primary
                        ? (pressed ? kAccentPressed
                                   : (hover ? kAccentHover : kAccent))
@@ -699,7 +699,7 @@ void DrawButton(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
     FillRounded(dc, r, Scale(::GetActiveWindow(), 8), fill);
     if (!primary) {
         StrokeRounded(dc, r, Scale(::GetActiveWindow(), 8),
-                      enabled ? kBorder : RGB(230, 234, 240));
+                      enabled ? kBorder : RGB(212, 218, 227));
     }
     if (focused && enabled) {
         RECT focus = r;
@@ -729,7 +729,7 @@ void DrawToggle(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
                   rect.top + (rect.bottom - rect.top + track_h) / 2};
     FillRounded(dc, track, track_h / 2,
                 on ? kAccent
-                   : (hover ? RGB(198, 204, 214) : RGB(212, 216, 222)));
+                   : (hover ? RGB(150, 158, 170) : RGB(164, 172, 184)));
     const int knob = track_h - Scale(::GetActiveWindow(), 4);
     const int knob_x = on ? track.right - knob - Scale(::GetActiveWindow(), 2)
                           : track.left + Scale(::GetActiveWindow(), 2);
@@ -763,7 +763,7 @@ void DrawRadio(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
                    rect.left + Scale(::GetActiveWindow(), 2) + size,
                    rect.top + (rect.bottom - rect.top + size) / 2};
     FillRounded(dc, circle, size / 2, checked ? kAccent : RGB(255, 255, 255));
-    StrokeRounded(dc, circle, size / 2, checked ? kAccent : RGB(180, 188, 198));
+    StrokeRounded(dc, circle, size / 2, checked ? kAccent : RGB(152, 160, 172));
     if (checked) {
         RECT dot = circle;
         ::InflateRect(&dot, -Scale(::GetActiveWindow(), 5),
