@@ -2,6 +2,7 @@
 
 #include "core/Logger.h"
 #include "core/Text.h"
+#include "resource_ids.h"
 
 namespace alt {
 
@@ -18,6 +19,8 @@ bool Window::Create(HINSTANCE instance, const std::wstring& class_name,
     wc.lpfnWndProc = &Window::StaticWndProc;
     wc.hInstance = instance;
     wc.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
+    wc.hIcon = ::LoadIconW(instance, MAKEINTRESOURCEW(IDI_ALTRUN));
+    wc.hIconSm = ::LoadIconW(instance, MAKEINTRESOURCEW(IDI_ALTRUN));
     wc.hbrBackground = nullptr;
     wc.lpszClassName = class_name_.c_str();
 

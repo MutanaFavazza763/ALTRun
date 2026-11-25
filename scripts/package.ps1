@@ -11,7 +11,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$Version = '2.0.5',
+    [string]$Version = '2.0.6',
     [ValidateSet('Release', 'Debug')]
     [string]$Configuration = 'Release',
     [switch]$SkipBuild,

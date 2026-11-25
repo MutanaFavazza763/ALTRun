@@ -278,7 +278,7 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | D23 | 关于窗 420×360（原版约 420×320） | 为容纳 7 行信息 + 可滚动正文 |
 | D24 | 唤出前检测虚拟桌面，必要时**重建**主窗（`DesktopSpace` + `App::RecreateMainWindow`） | Windows 无法把窗口搬到别的虚拟桌面；原版是 VCL `Show` 同样受此限制（表现为"热键没反应"）。重建后热键与托盘迁移到新 hwnd，查询失败时 fail-open 不重建 |
 | D25 | `ALTRun.ini` 若为 UTF-8 则启动时原地转 UTF-16 | Windows profile API 只认 ANSI 或带 BOM 的 UTF-16；Win11 记事本默认存 UTF-8，会让中文 `Lang`/字体名全变乱码。老 ANSI/GBK 文件不动，写回后仍由 profile API 维护 UTF-16 格式 |
-| D26 | 内置原版全部 224 键，并新增 76 个 `res*` 键（共 300 键）；默认列表名走 `[DefaultShortCutName]` | 原版语言文件的键集一致，内置后无需任何语言文件；重写独有的控件文案用 `res*` 补齐。默认列表的显示名按当前内置语言生成（GBK），与原版"按当前语言写默认名"的行为一致 |
+| D26 | 内置原版全部 224 键，并新增 74 个 `res*` 键（共 298 键）；默认列表名走 `[DefaultShortCutName]` | 原版语言文件的键集一致，内置后无需任何语言文件；重写独有的控件文案用 `res*` 补齐。默认列表的显示名按当前内置语言生成（GBK），与原版“按当前语言写默认名”的行为一致 |
 | D27 | 只支持 `zh_cn` / `zh_hk` / `en_us` 三种内置语言，不再加载 `.lang` 或 `About.<Lang>` | 用户明确要求收敛语言范围；旧 `Lang=EN/简体中文/繁体中文` 自动迁移，未知值回退 `en_us`，避免外置语言包造成 UI 不一致 |
 | D28 | 结果列表按**像素列**绘制，不依赖 `%-25s` 的空格对齐；超长文本以省略号截断 | 比例字体（Segoe UI 等）的空格宽度远小于字母，按字符数填充必然错列，12pt/14pt 下旧截图还会把第二列顶出右边界。`FormatListParts()` 只对两个占位符且中间是竖线的格式启用分列（`%s (%s)` 等仍按整行绘制），列宽取可见行"前缀+关键字"的最宽值并限制在 58% 内 |
 | D29 | 首次启动（无 ini）弹欢迎向导：语言、随 Windows 启动、发送到菜单 + 四条用法；默认语言取系统 UI 语言 | 原版首启只弹语言选择与两个系统集成询问，没有使用说明，用户不知道热键和参数星号；向导在选语言后才生成默认快捷项名，避免英文界面配中文默认名。接受后写 ini，因此只出现一次 |
@@ -294,11 +294,11 @@ cmake --build build/vs --config Release
 
 # 产物：build/vs/Release/ALTRun.exe + altRunTests.exe（res/ 会一并复制）
 .\build\vs\Release\ALTRun.exe --show      # 开发期直接展示启动器
-.\build\vs\Release\altRunTests.exe        # 核心单元测试（1048 项断言）
+.\build\vs\Release\altRunTests.exe        # 核心单元测试（1045 项断言）
 ctest --test-dir build/vs -C Release      # 或通过 CTest 运行
 
 # 便携版打包（exe + res + 文档 + 样例 ALTRun.ini → dist/ALTRun-<版本>-win64.zip）
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -Version 2.0.5
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -Version 2.0.6
 ```
 
 或使用预设：`cmake --preset msvc-release` / `cmake --build --preset release`（Ninja）。
@@ -309,7 +309,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -Version
 
 单元测试覆盖：GBK ⇄ UTF-8 往返、`ListFormat`/数字前缀/CJK 宽度、通配符→正则、
 打分公式与 `Sort()` 排序键、`ShortCutList.txt` 新旧两种格式解析与序列化往返、
-参数历史淘汰语义、路径/URL/.lnk 关键字推导、字体串容错解析、列表两列拆分、300 个本地化键
+参数历史淘汰语义、路径/URL/.lnk 关键字推导、字体串容错解析、列表两列拆分、298 个本地化键
 在 `en_us` / `zh_cn` / `zh_hk` 下全部可解析，以及旧语言值归一化。
 
 ## 14. 尚未实现（见 [ROADMAP.md](ROADMAP.md)）

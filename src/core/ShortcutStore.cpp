@@ -539,17 +539,17 @@ void ShortcutStore::SeedDefaultsIfMissing() {
         entries_.push_back(std::move(entry));
     };
 
-    // Mirrors the built-in list of the original launcher
-    // (docs/spec/03-shortcut-model.md §9.3). WinCtl.exe based entries are kept
-    // for fidelity even though that helper binary is not shipped.
+    // A modernized version of the original built-in list.  The original
+    // Upgrade link, Baidu Zhidao, IE-only browser row and dead Sogou/VeryCD/
+    // Yahoo searches are replaced by current equivalents.
     add("Computer", "DefaultShortCutName.Default_ShortCut_Name_0", ParamType::None,
         "::{20D04FE0-3AEA-1069-A2D8-08002B30309D}", 100);
     add("Explorer", "DefaultShortCutName.Default_ShortCut_Name_1", ParamType::None,
         "explorer.exe /e,::{20D04FE0-3AEA-1069-A2D8-08002B30309D}", 0);
     add("MyDocument", "DefaultShortCutName.Default_ShortCut_Name_2",
-        ParamType::None, "explorer.exe", 0);
-    add("ie", "DefaultShortCutName.Default_ShortCut_Name_3", ParamType::None,
-        "iexplore.exe", 8);
+        ParamType::None, "%USERPROFILE%\\Documents", 0);
+    add("browser", "DefaultShortCutName.Default_ShortCut_Name_3", ParamType::None,
+        "https://www.bing.com", 8);
     add("notepad", "DefaultShortCutName.Default_ShortCut_Name_4", ParamType::None,
         "notepad", 7);
     add("mspaint", "DefaultShortCutName.Default_ShortCut_Name_5", ParamType::None,
@@ -561,9 +561,9 @@ void ShortcutStore::SeedDefaultsIfMissing() {
     add("msconfig", "DefaultShortCutName.Default_ShortCut_Name_9", ParamType::None,
         "msconfig", 0);
     add("Reg", "DefaultShortCutName.Default_ShortCut_Name_10", ParamType::None,
-        "regedt32", 4);
+        "regedit", 4);
     add("myip", "DefaultShortCutName.Default_ShortCut_Name_11", ParamType::None,
-        "nslookup", 0);
+        "cmd /k ipconfig", 0);
     add("dev", "DefaultShortCutName.Default_ShortCut_Name_12", ParamType::None,
         "devmgmt.msc", 0);
     add("Taskmgr", "DefaultShortCutName.Default_ShortCut_Name_13",
@@ -582,21 +582,17 @@ void ShortcutStore::SeedDefaultsIfMissing() {
     add("Recent", "DefaultShortCutName.Default_ShortCut_Name_19", ParamType::None,
         "%USERPROFILE%\\Recent", 10);
     blank();
-    add("b", "DefaultShortCutName.Default_ShortCut_Name_20", ParamType::UrlQuery,
-        "http://www.baidu.com/s?wd=", 12);
+    add("b", "DefaultShortCutName.Default_ShortCut_Name_20", ParamType::Utf8Query,
+        "https://www.bing.com/search?q=", 12);
     add("g", "DefaultShortCutName.Default_ShortCut_Name_21", ParamType::Utf8Query,
-        "http://www.google.com/search?q=", 14);
-    add("s", "DefaultShortCutName.Default_ShortCut_Name_22", ParamType::UrlQuery,
-        "http://mp3.sogou.com/music.so?query=", 0);
-    add("zd", "DefaultShortCutName.Default_ShortCut_Name_23", ParamType::UrlQuery,
-        "http://zhidao.baidu.com/q?ct=17&pn=0&tn=ikaslist&rn=10&word=", 9);
+        "https://www.google.com/search?q=", 14);
+    add("s", "DefaultShortCutName.Default_ShortCut_Name_22", ParamType::Utf8Query,
+        "https://www.bing.com/images/search?q=", 0);
     add("v", "DefaultShortCutName.Default_ShortCut_Name_24", ParamType::Utf8Query,
-        "http://www.verycd.com/search/folders?kw=", 0);
+        "https://search.bilibili.com/all?keyword=", 0);
     add("y", "DefaultShortCutName.Default_ShortCut_Name_25", ParamType::Utf8Query,
-        "http://search.yahoo.com/search?p=", 0);
+        "https://www.zhihu.com/search?type=content&q=", 0);
     blank();
-    add("Upgrade", "DefaultShortCutName.Default_ShortCut_Name_26",
-        ParamType::None, "http://journeyboy.blog.sohu.com/112820379.html", 15);
     add("Config", "DefaultShortCutName.Default_ShortCut_Name_27", ParamType::None,
         ".\\ALTRun.ini", 0);
     blank();
@@ -610,10 +606,10 @@ void ShortcutStore::SeedDefaultsIfMissing() {
         ParamType::None, "Sysdm.cpl", 0);
     add("r", "DefaultShortCutName.Default_ShortCut_Name_32", ParamType::NoEncoding,
         "{%p}", 100);
-    add("cb", "DefaultShortCutName.Default_ShortCut_Name_33", ParamType::UrlQuery,
-        "http://www.baidu.com/s?wd={%c}", 12);
+    add("cb", "DefaultShortCutName.Default_ShortCut_Name_33", ParamType::Utf8Query,
+        "https://www.bing.com/search?q={%c}", 12);
     add("cg", "DefaultShortCutName.Default_ShortCut_Name_34", ParamType::Utf8Query,
-        "http://www.google.com/search?q={%c}", 24);
+        "https://www.google.com/search?q={%c}", 24);
 
     Save();
     Logger::Instance().Info("seeded default shortcut list");

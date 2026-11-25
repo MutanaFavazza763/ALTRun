@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(ALTRun
-    VERSION 2.0.5
+    VERSION 2.0.6
     DESCRIPTION "ALTRun - an alternative Run. Fast launcher for Windows."
-    LANGUAGES CXX)
+    LANGUAGES CXX RC)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,6 +15,7 @@ endif()
 
 set(ALTRUN_SOURCES
     src/main.cpp
+    src/ALTRun.rc
     src/app/App.cpp
     src/app/DesktopSpace.cpp
     src/app/Hotkey.cpp
@@ -45,6 +46,7 @@ set(ALTRUN_SOURCES
 )
 
 set(ALTRUN_HEADERS
+    src/resource_ids.h
     src/app/App.h
     src/app/DesktopSpace.h
     src/app/Hotkey.h

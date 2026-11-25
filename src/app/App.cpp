@@ -12,6 +12,7 @@
 #include "core/Localization.h"
 #include "core/Logger.h"
 #include "core/Text.h"
+#include "resource_ids.h"
 
 namespace alt {
 namespace {
@@ -509,7 +510,11 @@ bool App::AddTrayIcon() {
     tray_icon_.uID = 1;
     tray_icon_.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     tray_icon_.uCallbackMessage = kTrayCallbackMessage;
-    tray_icon_.hIcon = ::LoadIconW(nullptr, IDI_APPLICATION);
+    tray_icon_.hIcon = ::LoadIconW(instance_, MAKEINTRESOURCEW(IDI_ALTRUN));
+    if (tray_icon_.hIcon == nullptr) {
+        Logger::Instance().Warn("cannot load the embedded tray icon; using the generic icon");
+        tray_icon_.hIcon = ::LoadIconW(nullptr, IDI_APPLICATION);
+    }
     if (tray_icon_.hIcon == nullptr) {
         Logger::Instance().Warn("cannot load the tray icon");
         return false;

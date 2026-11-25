@@ -478,6 +478,9 @@ void TestLocalization() {
     CHECK(loc.Get("ConfigForm.ConfigList_0") == L"Auto run me when Windows start");
     loc.Load("zh_cn");
     CHECK(loc.Get("ConfigForm.ConfigList_0") == L"随系统自动启动");
+    CHECK(loc.Get("DefaultShortCutName.Default_ShortCut_Name_3") == L"默认浏览器");
+    CHECK(loc.Get("DefaultShortCutName.Default_ShortCut_Name_20") == L"Bing 搜索");
+    CHECK(loc.Get("DefaultShortCutName.Default_ShortCut_Name_33") == L"Bing 搜索剪贴板");
     loc.Load("zh_hk");
     CHECK(loc.Get("ConfigForm.ConfigList_0") == L"隨系統自動啟動");
     CHECK(loc.Get("resSaveListFailed").find(L"儲存") != std::wstring::npos);

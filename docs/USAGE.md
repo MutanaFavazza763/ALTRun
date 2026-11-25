@@ -88,7 +88,7 @@ ALTRun 是一个 Windows 快速启动器：按 `Alt + R` 唤出输入框，输�
 - 确认后的参数写入 `ParamHistory.txt`，下次可直接选。
 
 典型用途：`cmd /k %p`（`cmd` + 任意命令）、`r`（`{%p}` 直接当作"运行"对话框）、
-`b`/`g`（百度/Google 搜索词，自动编码）。
+`b`/`g`（Bing/Google 搜索词，自动编码）。
 
 ## 5. 最近执行
 

@@ -17,7 +17,7 @@
 - [x] 无边框 D2D 窗口：圆角、半透明、置顶、按光标显示器居中
 - [x] 全局热键（HotKey1/HotKey2）+ 单实例 + 托盘图标
 - [x] `ShortCutList.txt` 兼容读写（GBK、`F%-8d|%-20s|%-30s|%-30s|%s`、空行分隔）
-- [x] 首次运行生成与原版一致的默认快捷项列表（34 项）
+- [x] 首次运行生成与原版一致的默认快捷项列表（原版 34 项；2.0.6 起精简为 32 项）
 - [x] `FavoriteList.txt` 读写与 `RememberFavouratMatch` 置顶
 - [x] 正则/通配匹配 + 原版打分公式 + 空输入的 `Sort()` 排序键
 - [x] `ListFormat` 格式化 + 数字/参数前缀（`1|` / `*2|` / `  |`）
@@ -25,7 +25,7 @@
 - [x] `ALTRun.ini` 读写（键名与旧版一致）
 - [x] 键盘/鼠标交互、IME 输入、空闲与失焦隐藏、日志
 
-验收：编译通过；`--show` 启动后可见 34 项默认列表；输入 `note` 命中 notepad 并回车启动；
+验收：编译通过；`--show` 启动后可见 32 项默认列表；输入 `note` 命中 notepad 并回车启动；
 `ShortCutList.txt` 被旧版程序可读（GBK 格式一致）。
 
 ## M2 — 参数与最近列表（✅）
@@ -82,7 +82,7 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 - [x] 修复既有 bug：`ShortcutStore::Load()` 会因文件末尾 CRLF 多生成一个空白行，
       导致每次启动/保存列表不断增长
 
-验收：`--manager` 打开管理器可见 34 项 + 空白分隔行；新增/编辑/删除/拖拽后立即落盘；
+验收：`--manager` 打开管理器可见 32 项 + 空白分隔行；新增/编辑/删除/拖拽后立即落盘；
 重启后列表行数不再递增（连续 3 次启停均为 42 行）；编辑对话框可打开并取消。
 
 ## M5 — 外观与系统集成（✅）
@@ -159,7 +159,7 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 - [x] 首次默认语言取系统 UI 语言；默认快捷项名在向导确认后才生成，
       避免英文界面配中文默认名
 - [x] `--welcome` 开发标志可强制打开向导，便于检查三种语言排版
-- [x] 测试：300 键 × 3 语言 + 两列/整行拆分样例，断言数 1024 → **1048**
+- [x] 测试：298 键 × 3 语言 + 两列/整行拆分样例，断言数 1024 → **1045**
 
 验收：12pt 与 14pt 比例字体下列表第二列对齐；长名称显示省略号；
 空目录首启看到中文向导，选 English 后默认列表名为 `My Computer`。
@@ -179,6 +179,22 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 
 验收：正常目录启动后任务栏可见区出现 ALTRun 图标，Explorer 重启后仍在；
 低完整性目录不会静默驻留。证据：`07-evidence/tray/`。
+
+## M11 — 原版星形图标与默认列表现代化（✅，2.0.6）
+
+- [x] 把原 Delphi 工程 `Res/Carracho.ico` 嵌入 exe（`IDI_ALTRUN`），托盘、窗口类、
+      Alt+Tab 统一使用星形图标；托盘不再使用 `IDI_APPLICATION`
+- [x] 默认列表删除 `Upgrade` 升级网址与百度知道，`iexplore.exe` 改为默认浏览器
+      （`browser` → `https://www.bing.com`）
+- [x] 百度搜索改 Bing（含剪贴板版 `cb`）；Sogou/VeryCD/Yahoo 替换为 Bing 图片、
+      Bilibili、知乎；`MyDocument` 指向用户文档，`Reg` 用 `regedit`，`myip` 用
+      `ipconfig`
+- [x] 三语言默认名同步：默认浏览器 / Bing 搜索 / Bing 搜索剪贴板
+- [x] 验证：1045 checks / 0 failure，CTest 1/1；三语言种子各 32 项，无百度/IE/
+      Upgrade 残留；任务栏真实桌面可见星形图标
+
+验收：干净目录首启列表 32 项；托盘图标为原版黄色星形。证据：
+`07-evidence/tray/taskbar-star-206.png`、`07-evidence/defaults-206-runtime/`。
 
 ## 后续可选增强（⏳）
 
