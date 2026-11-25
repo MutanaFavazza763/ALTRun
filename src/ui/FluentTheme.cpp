@@ -142,6 +142,7 @@ struct ButtonState {
     bool pressed = false;
     bool focused = false;
     bool primary = false;
+    bool chevron = false;
     HFONT font = nullptr;
 };
 
@@ -292,7 +293,7 @@ LRESULT CALLBACK ButtonProc(HWND hwnd, UINT message, WPARAM wparam,
             ::GetWindowTextW(hwnd, text, static_cast<int>(std::size(text)));
             DrawButton(dc, client, text, state->font, state->primary,
                        state->hover, state->pressed, state->focused,
-                       ::IsWindowEnabled(hwnd) != FALSE);
+                       ::IsWindowEnabled(hwnd) != FALSE, state->chevron);
             ::EndPaint(hwnd, &paint);
             return 0;
         }
@@ -466,7 +467,8 @@ LRESULT CALLBACK RadioProc(HWND hwnd, UINT message, WPARAM wparam,
 
 HWND CreateCustomButton(HWND parent, HINSTANCE instance, int id,
                         const std::wstring& text, HFONT font, int width,
-                        int height, int dpi, bool primary, bool radio) {
+                        int height, int dpi, bool primary, bool radio,
+                        bool chevron) {
     HWND control = ::CreateWindowExW(
         0, WC_BUTTONW, text.c_str(),
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 0, 0,
@@ -489,6 +491,7 @@ HWND CreateCustomButton(HWND parent, HINSTANCE instance, int id,
         auto* state = new ButtonState();
         state->font = font;
         state->primary = true;
+        state->chevron = chevron;
         ::SetWindowLongPtrW(control, GWLP_USERDATA,
                             reinterpret_cast<LONG_PTR>(state));
         ::SetWindowSubclass(control, &ButtonProc, 1, 0);
@@ -498,6 +501,7 @@ HWND CreateCustomButton(HWND parent, HINSTANCE instance, int id,
         auto* state = new ButtonState();
         state->font = font;
         state->primary = false;
+        state->chevron = chevron;
         ::SetWindowLongPtrW(control, GWLP_USERDATA,
                             reinterpret_cast<LONG_PTR>(state));
         ::SetWindowSubclass(control, &ButtonProc, 1, 0);
@@ -687,7 +691,7 @@ void DrawNavItem(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
 
 void DrawButton(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
                 bool primary, bool hover, bool pressed, bool focused,
-                bool enabled) {
+                bool enabled, bool chevron) {
     const COLORREF fill =
         !enabled ? RGB(245, 247, 250)
                  : primary
@@ -711,10 +715,43 @@ void DrawButton(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
                                 : (primary ? RGB(255, 255, 255) : kText));
     HGDIOBJ old_font = ::SelectObject(dc, font != nullptr ? font
                                                          : ::GetStockObject(DEFAULT_GUI_FONT));
-    RECT text_rect = rect;
+    if (!chevron) {
+        RECT text_rect = rect;
+        ::DrawTextW(dc, text.c_str(), -1, &text_rect,
+                    DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS |
+                        DT_NOPREFIX);
+        ::SelectObject(dc, old_font);
+        return;
+    }
+
+    // A menu button draws the label and a small, thin chevron as one centered
+    // group.  The old "\u25BE" glyph looked like a stray black triangle because
+    // it was pushed to the far edge of a wide button.
+    SIZE text_size = {};
+    ::GetTextExtentPoint32W(dc, text.c_str(),
+                            static_cast<int>(text.size()), &text_size);
+    const int active_dpi = ::GetDpiForWindow(::GetActiveWindow());
+    const int gap = ::MulDiv(10, active_dpi <= 0 ? 96 : active_dpi, 96);
+    const int chevron_width = ::MulDiv(9, active_dpi <= 0 ? 96 : active_dpi, 96);
+    const int content_width = text_size.cx + gap + chevron_width;
+    const int start_x =
+        rect.left + ((rect.right - rect.left) - content_width) / 2;
+    RECT text_rect = {start_x, rect.top, start_x + text_size.cx + 2, rect.bottom};
     ::DrawTextW(dc, text.c_str(), -1, &text_rect,
-                DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS |
-                    DT_NOPREFIX);
+                DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+
+    const int cx = start_x + text_size.cx + gap;
+    const int cy = (rect.top + rect.bottom) / 2;
+    const int half = ::MulDiv(3, active_dpi <= 0 ? 96 : active_dpi, 96);
+    const int width = ::MulDiv(1, active_dpi <= 0 ? 96 : active_dpi, 96);
+    HPEN pen = ::CreatePen(PS_SOLID, std::max(1, width),
+                           enabled ? kTextSecondary : kTextDisabled);
+    HGDIOBJ old_pen = ::SelectObject(dc, pen);
+    ::MoveToEx(dc, cx, cy - half, nullptr);
+    ::LineTo(dc, cx + chevron_width / 2, cy + half);
+    ::LineTo(dc, cx + chevron_width, cy - half);
+    ::SelectObject(dc, old_pen);
+    ::DeleteObject(pen);
     ::SelectObject(dc, old_font);
 }
 
@@ -814,15 +851,16 @@ HWND CreateToggle(HWND parent, HINSTANCE instance, int id, const std::wstring& t
 }
 
 HWND CreateButton(HWND parent, HINSTANCE instance, int id, const std::wstring& text,
-                  HFONT font, int width, int height, int dpi, bool primary) {
+                  HFONT font, int width, int height, int dpi, bool primary,
+                  bool chevron) {
     return CreateCustomButton(parent, instance, id, text, font, width, height,
-                              dpi, primary, false);
+                              dpi, primary, false, chevron);
 }
 
 HWND CreateRadio(HWND parent, HINSTANCE instance, int id, const std::wstring& text,
                  HFONT font, int width, int height, int dpi) {
     return CreateCustomButton(parent, instance, id, text, font, width, height,
-                              dpi, false, true);
+                              dpi, false, true, false);
 }
 
 }  // namespace fluent

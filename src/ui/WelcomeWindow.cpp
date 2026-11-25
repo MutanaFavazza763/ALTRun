@@ -30,18 +30,18 @@ constexpr int kContentWidth = kWindowWidth - 2 * kMargin;
 
 constexpr int kCardTop = 72;
 constexpr int kCardBottom = 496;
-constexpr int kIntroY = 96;
-constexpr int kGuideY = 138;
-constexpr int kGuideHeight = 98;
-constexpr int kLanguageLabelY = 244;
-constexpr int kLanguageComboY = 272;
-constexpr int kAutoRunY = 320;
-constexpr int kSendToY = 356;
-constexpr int kNoteY = 396;
-constexpr int kNoteHeight = 48;
+constexpr int kIntroY = 92;
+constexpr int kGuideY = 130;
+constexpr int kGuideHeight = 84;
+constexpr int kLanguageLabelY = 226;
+constexpr int kLanguageComboY = 254;
+constexpr int kAutoRunY = 296;
+constexpr int kSendToY = 332;
+constexpr int kNoteY = 368;
+constexpr int kNoteHeight = 42;
 constexpr int kButtonWidth = 160;
 constexpr int kButtonHeight = 36;
-constexpr int kButtonY = 452;
+constexpr int kButtonY = 420;
 
 constexpr int kIdStart = IDOK;
 constexpr int kIdLanguage = 3001;
@@ -159,7 +159,7 @@ void WelcomeWindow::CreateControls() {
     language_label_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
                                    kMargin + 24, kLanguageLabelY, 160, 24, 0);
     language_button_ = fluent::CreateButton(
-        hwnd_, instance_, kIdLanguage, L"", font_, 220, 34, dpi_, false);
+        hwnd_, instance_, kIdLanguage, L"", font_, 200, 34, dpi_, false, true);
     if (language_button_ != nullptr) {
         ::SetWindowPos(language_button_, nullptr, S(kMargin + 24),
                        S(kLanguageComboY), 0, 0, SWP_NOSIZE | SWP_NOZORDER);
@@ -324,7 +324,6 @@ void WelcomeWindow::UpdateLanguageButton() {
         return;
     }
     std::wstring label = kLanguageNames[language_index_];
-    label += L"    \u25BE";
     ::SetWindowTextW(language_button_, label.c_str());
     ::InvalidateRect(language_button_, nullptr, TRUE);
 }

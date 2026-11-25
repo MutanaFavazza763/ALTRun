@@ -56,6 +56,43 @@ std::wstring ExeDirectory() {
     return DirectoryOf(exe);
 }
 
+// UI-facing paths stay portable: files next to the executable are shown as
+// ".\name", and paths below the current profile as "%USERPROFILE%\...".
+// The full absolute path remains available in the tooltip and on copy.
+std::wstring DisplayPath(const std::wstring& path) {
+    if (path.empty()) {
+        return path;
+    }
+    const std::wstring directory = ExeDirectory();
+    if (!directory.empty() && path.size() >= directory.size() &&
+        ::CompareStringOrdinal(path.c_str(),
+                               static_cast<int>(directory.size()),
+                               directory.c_str(),
+                               static_cast<int>(directory.size()), TRUE) ==
+            CSTR_EQUAL) {
+        const std::wstring rest = path.substr(directory.size());
+        return rest.empty() ? L".\\" : L".\\" + rest;
+    }
+
+    wchar_t profile[MAX_PATH] = {};
+    const DWORD profile_length =
+        ::GetEnvironmentVariableW(L"USERPROFILE", profile,
+                                  static_cast<DWORD>(std::size(profile)));
+    if (profile_length > 0 && profile_length < std::size(profile)) {
+        std::wstring base(profile, profile_length);
+        if (!base.empty() && base.back() != L'\\' && base.back() != L'/') {
+            base.push_back(L'\\');
+        }
+        if (path.size() >= base.size() &&
+            ::CompareStringOrdinal(path.c_str(), static_cast<int>(base.size()),
+                                   base.c_str(), static_cast<int>(base.size()),
+                                   TRUE) == CSTR_EQUAL) {
+            return L"%USERPROFILE%\\" + path.substr(base.size());
+        }
+    }
+    return path;
+}
+
 bool IsModifierKey(int vk) {
     return vk == VK_CONTROL || vk == VK_LCONTROL || vk == VK_RCONTROL ||
            vk == VK_MENU || vk == VK_LMENU || vk == VK_RMENU ||
@@ -309,7 +346,7 @@ void MainWindow::LoadSettings() {
     const std::wstring ini_path = settings_.ini_path.empty()
                                      ? ExeDirectory() + L"ALTRun.ini"
                                      : settings_.ini_path;
-    AboutIniPath().Text(hstring(ini_path));
+    AboutIniPath().Text(hstring(DisplayPath(ini_path)));
     ToolTipService::SetToolTip(AboutIniPath(), box_value(hstring(ini_path)));
     CopyIniButton().Tag(box_value(hstring(ini_path)));
     AboutRunCount().Text(hstring(alt::LocArgInt(
@@ -325,17 +362,17 @@ void MainWindow::LoadSettings() {
     const std::wstring favourite_list =
         (dir.empty() ? ExeDirectory() : dir) + L"FavoriteList.txt";
 
-    AboutParamHistory().Text(hstring(param_history));
+    AboutParamHistory().Text(hstring(DisplayPath(param_history)));
     ToolTipService::SetToolTip(AboutParamHistory(),
                                box_value(hstring(param_history)));
     CopyParamHistoryButton().Tag(box_value(hstring(param_history)));
 
-    AboutShortcutList().Text(hstring(shortcut_list));
+    AboutShortcutList().Text(hstring(DisplayPath(shortcut_list)));
     ToolTipService::SetToolTip(AboutShortcutList(),
                                box_value(hstring(shortcut_list)));
     CopyShortcutListButton().Tag(box_value(hstring(shortcut_list)));
 
-    AboutFavouriteList().Text(hstring(favourite_list));
+    AboutFavouriteList().Text(hstring(DisplayPath(favourite_list)));
     ToolTipService::SetToolTip(AboutFavouriteList(),
                                box_value(hstring(favourite_list)));
     CopyFavouriteButton().Tag(box_value(hstring(favourite_list)));

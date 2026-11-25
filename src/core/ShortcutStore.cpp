@@ -65,6 +65,14 @@ bool IsAllDigits(std::string_view text) {
     });
 }
 
+bool LooksLikeFrequencyField(std::string_view text) {
+    const std::string_view trimmed = TrimAscii(text);
+    if (trimmed.empty() || (trimmed.front() != 'F' && trimmed.front() != 'f')) {
+        return false;
+    }
+    return IsAllDigits(trimmed.substr(1));
+}
+
 // Pads a UTF-8 field with spaces until its ANSI (GBK) representation is at
 // least |width| bytes, mirroring Delphi's Format('%-20s', ...) on AnsiString.
 std::string PadField(const std::string& utf8, size_t width) {
@@ -222,6 +230,28 @@ bool ShortcutStore::ParseLine(std::string_view raw_line, ShortcutEntry* entry) {
     char delimiter = '|';
     if (pipes >= 3) {
         parts = SplitKeepAll(line, '|');
+        // Tolerate the human-edited "keyword||name|command" form: the empty
+        // field is a missing parameter type, not a missing keyword. Without
+        // this branch the parser would put "name|command" into command_line
+        // and every such row would fail at launch.
+        if (parts.size() == 4 && TrimAscii(parts[1]).empty() &&
+            !LooksLikeFrequencyField(parts[0])) {
+            entry->item.keyword = TrimDelphi(parts[0]);
+            entry->item.name = TrimDelphi(parts[2]);
+            entry->item.command_line = TrimDelphi(JoinFrom(parts, 3, '|'));
+            return true;
+        }
+    } else if (pipes == 2) {
+        // Also accept the simple three-field display form
+        // "keyword|name|command". It is not the original five-field storage
+        // format, but it is what users naturally hand-edit.
+        parts = SplitKeepAll(line, '|');
+        if (parts.size() >= 3) {
+            entry->item.keyword = TrimDelphi(parts[0]);
+            entry->item.name = TrimDelphi(parts[1]);
+            entry->item.command_line = TrimDelphi(JoinFrom(parts, 2, '|'));
+            return true;
+        }
     } else {
         delimiter = ',';
         parts = SplitKeepAll(line, ',');

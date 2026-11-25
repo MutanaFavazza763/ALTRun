@@ -39,6 +39,25 @@ constexpr int kContentLabelY = 240;
 constexpr int kContentEditY = 266;
 constexpr int kContentEditHeight = 154;
 
+// Display-only path: keep the UI portable instead of printing the current
+// account name. The full path is still copied when opening the folder.
+std::wstring DisplayPath(const std::wstring& path) {
+    if (path.empty()) {
+        return path;
+    }
+    const std::wstring directory = ShellIntegration::ExecutableDirectory();
+    if (!directory.empty() && path.size() >= directory.size() &&
+        ::CompareStringOrdinal(path.c_str(),
+                               static_cast<int>(directory.size()),
+                               directory.c_str(),
+                               static_cast<int>(directory.size()), TRUE) ==
+            CSTR_EQUAL) {
+        const std::wstring rest = path.substr(directory.size());
+        return rest.empty() ? L".\\" : L".\\" + rest;
+    }
+    return path;
+}
+
 constexpr int kIdClose = IDOK;
 
 }  // namespace
@@ -215,10 +234,11 @@ void AboutWindow::RefreshTexts() {
         ini_path = ShellIntegration::ExecutableDirectory() + L"ALTRun.ini";
     }
     ::SetWindowTextW(ini_path_text_,
-                     (text.Get("resAboutIniPath") + ini_path).c_str());
+                     (text.Get("resAboutIniPath") + DisplayPath(ini_path)).c_str());
     ::SetWindowTextW(
         data_dir_text_,
-        (text.Get("resAboutDataDir") + ShellIntegration::ExecutableDirectory())
+        (text.Get("resAboutDataDir") +
+         DisplayPath(ShellIntegration::ExecutableDirectory()))
             .c_str());
 
     LoadAboutText();

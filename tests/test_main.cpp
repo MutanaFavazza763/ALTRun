@@ -284,6 +284,18 @@ void TestShortcutStoreParsing() {
     CHECK(alt::ShortcutStore::ParseLine("F0||x|X|cmd /c echo a|b", &entry));
     CHECK_STR(entry.item.command_line, "cmd /c echo a|b");
 
+    // Hand-edited display forms: "keyword|name|command" and the common
+    // "keyword||name|command" typo. The name must never leak into the command.
+    CHECK(alt::ShortcutStore::ParseLine("notepad|Notepad|notepad.exe", &entry));
+    CHECK_STR(entry.item.keyword, "notepad");
+    CHECK_STR(entry.item.name, "Notepad");
+    CHECK_STR(entry.item.command_line, "notepad.exe");
+
+    CHECK(alt::ShortcutStore::ParseLine("notepad||Notepad|notepad.exe", &entry));
+    CHECK_STR(entry.item.keyword, "notepad");
+    CHECK_STR(entry.item.name, "Notepad");
+    CHECK_STR(entry.item.command_line, "notepad.exe");
+
     // Non-parsable row (fewer than three fields) is dropped.
     CHECK(!alt::ShortcutStore::ParseLine("garbage", &entry));
 

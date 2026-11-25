@@ -50,7 +50,7 @@ void DrawNavItem(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
                  bool selected, bool hover);
 void DrawButton(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
                 bool primary, bool hover, bool pressed, bool focused,
-                bool enabled = true);
+                bool enabled = true, bool chevron = false);
 void DrawToggle(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
                 bool on, bool hover, bool focused);
 void DrawRadio(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
@@ -63,7 +63,8 @@ void DrawSeparator(HDC dc, const RECT& rect);
 HWND CreateToggle(HWND parent, HINSTANCE instance, int id, const std::wstring& text,
                   HFONT font, int width, int height, int dpi);
 HWND CreateButton(HWND parent, HINSTANCE instance, int id, const std::wstring& text,
-                  HFONT font, int width, int height, int dpi, bool primary);
+                  HFONT font, int width, int height, int dpi, bool primary,
+                  bool chevron = false);
 HWND CreateRadio(HWND parent, HINSTANCE instance, int id, const std::wstring& text,
                  HFONT font, int width, int height, int dpi);
 

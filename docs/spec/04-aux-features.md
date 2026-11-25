@@ -113,7 +113,7 @@ LogFileName := StringReplace(Application.ExeName, '.exe', '.' + GetCurrentUserNa
 
 （`Unit\untLogger.pas:52`）
 
-- 位置：**exe 同目录**；名字：`<exe 基名>.<登录用户名>.log`，如 `ALTRun.MFOrange.log`。
+- 位置：**exe 同目录**；名字：`<exe 基名>.<登录用户名>.log`，如 `ALTRun.<用户名>.log`。
 - 用户名：`GetUserName`，缓冲区常量 `cnMaxUserNameLen = 254`（`:29-41`，常量在 `:31`）。
 - 注意 `rfReplaceAll` 会替换路径中所有 `.exe` 子串（通常只出现在末尾，风险低）。
 
