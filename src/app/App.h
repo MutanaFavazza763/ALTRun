@@ -54,6 +54,11 @@ private:
     bool RecreateMainWindow();
     void ShowTrayMenu();
     void OnTrayCallback(LPARAM lparam);
+    // Prefer the WinUI 3 settings process; create the native dialog only when
+    // ALTRun.Settings.exe or its Windows App SDK runtime is unavailable.
+    bool LaunchSettingsApp(const wchar_t* page);
+    void OpenSettingsWindow();
+    void OpenAboutWindow();
     void ApplyAutoRun(bool enabled);
     // Re-applies settings that need runtime action: hotkeys, auto-run, logging
     // and the launcher window's alpha/size/timers.

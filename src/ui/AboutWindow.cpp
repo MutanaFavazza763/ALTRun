@@ -1,6 +1,8 @@
 #include "ui/AboutWindow.h"
 
+#include <commctrl.h>
 #include <dwmapi.h>
+#include <windowsx.h>
 
 #include <string>
 
@@ -8,33 +10,34 @@
 #include "core/Localization.h"
 #include "core/Logger.h"
 #include "core/Text.h"
+#include "ui/FluentTheme.h"
 #include "ui/UiText.h"
 
 namespace alt {
 namespace {
 
-constexpr wchar_t kWindowClass[] = L"ALTRun.AboutWindow.v2";
-constexpr wchar_t kVersion[] = L"2.0 (C++ rewrite)";
+constexpr wchar_t kWindowClass[] = L"ALTRun.AboutWindow.v3";
+constexpr wchar_t kVersion[] = L"2.1.0";
 
 // Layout in 96-DPI design units (scaled through AboutWindow::S()).
-constexpr int kWindowWidth = 420;
-constexpr int kWindowHeight = 360;
-constexpr int kHeaderHeight = 44;
-constexpr int kMargin = 16;
+constexpr int kWindowWidth = 560;
+constexpr int kWindowHeight = 520;
+constexpr int kHeaderHeight = 48;
+constexpr int kMargin = 24;
 constexpr int kContentWidth = kWindowWidth - 2 * kMargin;
-constexpr int kRowHeight = 22;
-constexpr int kButtonWidth = 84;
-constexpr int kButtonHeight = 30;
+constexpr int kRowHeight = 24;
+constexpr int kButtonWidth = 120;
+constexpr int kButtonHeight = 34;
+constexpr int kButtonY = 478;
 
-constexpr int kTitleY = 52;
-constexpr int kSourceY = 82;
-constexpr int kRunCountY = 104;
-constexpr int kIniPathY = 126;
-constexpr int kDataDirY = 148;
-constexpr int kContentLabelY = 172;
-constexpr int kContentEditY = 194;
-constexpr int kContentEditHeight = 112;
-constexpr int kButtonY = 316;
+constexpr int kTitleY = 84;
+constexpr int kSourceY = 132;
+constexpr int kRunCountY = 158;
+constexpr int kIniPathY = 184;
+constexpr int kDataDirY = 208;
+constexpr int kContentLabelY = 240;
+constexpr int kContentEditY = 266;
+constexpr int kContentEditHeight = 154;
 
 constexpr int kIdClose = IDOK;
 
@@ -49,8 +52,7 @@ AboutWindow::~AboutWindow() { DestroyResources(); }
 
 bool AboutWindow::CreateAboutWindow(HINSTANCE instance) {
     if (!Create(instance, kWindowClass, Loc("resAboutTitle"),
-                WS_POPUP | WS_CLIPCHILDREN,
-                WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) {
+                WS_POPUP, WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) {
         return false;
     }
     const DWORD corner_preference = 2;  // DWMWCP_ROUND (Windows 11), best effort
@@ -81,7 +83,7 @@ void AboutWindow::CreateFonts() {
 
     LOGFONTW title_log = {};
     if (::GetObjectW(font_, static_cast<int>(sizeof(title_log)), &title_log) != 0) {
-        title_log.lfHeight = static_cast<LONG>(title_log.lfHeight * 1.35);
+        title_log.lfHeight = -::MulDiv(17, dpi_, 72);
         title_log.lfWeight = FW_SEMIBOLD;
         title_font_ = ::CreateFontIndirectW(&title_log);
     }
@@ -127,7 +129,7 @@ HWND AboutWindow::MakeControl(const wchar_t* class_name, const wchar_t* text,
 
 void AboutWindow::CreateControls() {
     title_text_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
-                              kMargin, kTitleY, kContentWidth, 28, 0);
+                              kMargin + 52, kTitleY, kContentWidth - 52, 40, 0);
     if (title_text_ != nullptr) {
         ::SendMessageW(title_text_, WM_SETFONT,
                        reinterpret_cast<WPARAM>(title_font_ != nullptr ? title_font_
@@ -135,41 +137,46 @@ void AboutWindow::CreateControls() {
                        TRUE);
     }
     source_text_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
-                               kMargin, kSourceY, kContentWidth, kRowHeight, 0);
+                               kMargin + 52, kSourceY, kContentWidth - 52,
+                               kRowHeight, 0);
     run_count_text_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
-                                  kMargin, kRunCountY, kContentWidth, kRowHeight, 0);
+                                  kMargin + 52, kRunCountY, kContentWidth - 52,
+                                  kRowHeight, 0);
     ini_path_text_ = MakeControl(WC_STATICW, L"",
                                  WS_CHILD | WS_VISIBLE | SS_LEFT | SS_PATHELLIPSIS,
-                                 kMargin, kIniPathY, kContentWidth, kRowHeight, 0);
+                                 kMargin + 52, kIniPathY, kContentWidth - 52,
+                                 kRowHeight, 0);
     data_dir_text_ = MakeControl(WC_STATICW, L"",
                                  WS_CHILD | WS_VISIBLE | SS_LEFT | SS_PATHELLIPSIS,
-                                 kMargin, kDataDirY, kContentWidth, kRowHeight, 0);
+                                 kMargin + 52, kDataDirY, kContentWidth - 52,
+                                 kRowHeight, 0);
     content_label_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
-                                 kMargin, kContentLabelY, kContentWidth, kRowHeight,
-                                 0);
+                                 kMargin + 24, kContentLabelY,
+                                 kContentWidth - 48, kRowHeight, 0);
 
     // Read-only multiline EDIT: scrolls, can take focus and lets the user
     // select the URLs in the built-in about text (a STATIC cannot).
     content_edit_ = MakeControl(
         WC_EDITW, L"",
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | ES_LEFT | ES_MULTILINE |
-            ES_READONLY | ES_AUTOVSCROLL,
-        kMargin, kContentEditY, kContentWidth, kContentEditHeight, 0);
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER | WS_VSCROLL | ES_LEFT |
+            ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
+        kMargin + 24, kContentEditY, kContentWidth - 48, kContentEditHeight, 0);
     if (content_edit_ != nullptr) {
         ::SendMessageW(content_edit_, EM_SETMARGINS,
                        EC_LEFTMARGIN | EC_RIGHTMARGIN,
-                       MAKELPARAM(S(4), S(4)));
-        ::SetWindowSubclass(content_edit_, &AboutWindow::ChildSubclassProc, 1,
+                       MAKELPARAM(S(8), S(8)));
+        ::SetWindowSubclass(content_edit_, &AboutWindow::ChildSubclassProc, 2,
                             reinterpret_cast<DWORD_PTR>(this));
     }
 
-    close_button_ = MakeControl(
-        WC_BUTTONW, Loc("Common.BtnClose").c_str(),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        kWindowWidth - kMargin - kButtonWidth, kButtonY, kButtonWidth,
-        kButtonHeight, kIdClose);
+    close_button_ = fluent::CreateButton(
+        hwnd_, instance_, kIdClose, Loc("Common.BtnClose"), font_, kButtonWidth,
+        kButtonHeight, dpi_, true);
     if (close_button_ != nullptr) {
-        ::SetWindowSubclass(close_button_, &AboutWindow::ChildSubclassProc, 1,
+        ::SetWindowPos(close_button_, nullptr,
+                       S(kWindowWidth - kMargin - kButtonWidth), S(kButtonY), 0,
+                       0, SWP_NOSIZE | SWP_NOZORDER);
+        ::SetWindowSubclass(close_button_, &AboutWindow::ChildSubclassProc, 2,
                             reinterpret_cast<DWORD_PTR>(this));
     }
 }
@@ -191,8 +198,7 @@ void AboutWindow::RefreshTexts() {
     }
     const Localization& text = Localization::Instance();
     const std::wstring title =
-        text.Get("resAboutTitle") + L" " + kVersion;
-    ::SetWindowTextW(title_text_, title.c_str());
+        text.Get("resAboutTitle") + L" " + kVersion;    ::SetWindowTextW(title_text_, title.c_str());
     ::SetWindowTextW(source_text_, text.Get("resAboutSource").c_str());
 
     std::wstring count = text.Get("resAboutRunCount");
@@ -272,22 +278,36 @@ void AboutWindow::DrawHeader(HDC dc) const {
     }
     RECT client = {};
     ::GetClientRect(hwnd_, &client);
+    fluent::FillBackground(dc, client);
+    fluent::DrawTitleBar(dc, hwnd_, Loc("resAboutTitle"), title_font_,
+                         S(kHeaderHeight));
 
-    ::SetBkMode(dc, TRANSPARENT);
-    ::SetTextColor(dc, ::GetSysColor(COLOR_BTNTEXT));
-    HGDIOBJ previous = ::SelectObject(dc, title_font_);
-    RECT title = {S(20), S(4), client.right - S(20), S(kHeaderHeight - 6)};
-    const std::wstring header = Loc("resAboutTitle");
-    ::DrawTextW(dc, header.c_str(), -1, &title,
-                DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
-    ::SelectObject(dc, previous);
+    RECT card = {S(kMargin), S(64), S(kWindowWidth - kMargin), S(464)};
+    fluent::DrawCard(dc, card, S(14));
 
-    const RECT separator = {S(16), S(kHeaderHeight), client.right - S(16),
-                            S(kHeaderHeight) + 1};
-    ::FillRect(dc, &separator, ::GetSysColorBrush(COLOR_3DSHADOW));
+    RECT footer = {S(kMargin), S(472), S(kWindowWidth - kMargin), S(504)};
+    fluent::FillRounded(dc, footer, S(10), fluent::kSurface);
+    fluent::StrokeRounded(dc, footer, S(10), fluent::kBorder);
+
+    HICON icon = fluent::AppIcon();
+    if (icon != nullptr) {
+        ::DrawIconEx(dc, S(kMargin), S(84), icon, S(40), S(40), 0, nullptr,
+                     DI_NORMAL);
+    }
 }
 
 LRESULT AboutWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
+    const int title_height = S(kHeaderHeight);
+    if (message == WM_NCHITTEST || message == WM_MOUSEMOVE ||
+        message == WM_MOUSELEAVE || message == WM_LBUTTONUP) {
+        const LRESULT chrome =
+            fluent::HandleChromeMessage(hwnd_, message, wparam, lparam,
+                                        title_height);
+        if (chrome != -1) {
+            return chrome;
+        }
+    }
+
     switch (message) {
         case WM_COMMAND:
             if (HIWORD(wparam) == BN_CLICKED && LOWORD(wparam) == kIdClose) {
@@ -305,15 +325,8 @@ LRESULT AboutWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
                 return 0;
             }
             break;
-        case WM_ERASEBKGND: {
-            HDC dc = reinterpret_cast<HDC>(wparam);
-            RECT client = {};
-            ::GetClientRect(hwnd_, &client);
-            if (background_brush_ != nullptr) {
-                ::FillRect(dc, &client, background_brush_);
-            }
+        case WM_ERASEBKGND:
             return 1;
-        }
         case WM_PAINT: {
             PAINTSTRUCT paint = {};
             HDC dc = ::BeginPaint(hwnd_, &paint);
@@ -326,18 +339,20 @@ LRESULT AboutWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
             // The read-only multiline EDIT paints through WM_CTLCOLORSTATIC
             // too; keep it white so it reads like a document.
             if (reinterpret_cast<HWND>(lparam) == content_edit_) {
-                ::SetBkColor(dc, ::GetSysColor(COLOR_WINDOW));
-                ::SetTextColor(dc, ::GetSysColor(COLOR_WINDOWTEXT));
-                return reinterpret_cast<LRESULT>(::GetSysColorBrush(COLOR_WINDOW));
+                ::SetBkColor(dc, fluent::kSurface);
+                ::SetTextColor(dc, fluent::kText);
+                return reinterpret_cast<LRESULT>(::GetStockObject(WHITE_BRUSH));
             }
             ::SetBkMode(dc, TRANSPARENT);
-            return reinterpret_cast<LRESULT>(background_brush_);
+            ::SetTextColor(dc, fluent::kTextSecondary);
+            return reinterpret_cast<LRESULT>(
+                ::GetStockObject(HOLLOW_BRUSH));
         }
         case WM_CTLCOLOREDIT: {
             HDC dc = reinterpret_cast<HDC>(wparam);
-            ::SetBkColor(dc, ::GetSysColor(COLOR_WINDOW));
-            ::SetTextColor(dc, ::GetSysColor(COLOR_WINDOWTEXT));
-            return reinterpret_cast<LRESULT>(::GetSysColorBrush(COLOR_WINDOW));
+            ::SetBkColor(dc, fluent::kSurface);
+            ::SetTextColor(dc, fluent::kText);
+            return reinterpret_cast<LRESULT>(::GetStockObject(WHITE_BRUSH));
         }
         case WM_DESTROY:
             // Also covered by the destructor; handled for an explicit Destroy()
@@ -388,3 +403,4 @@ LRESULT CALLBACK AboutWindow::ChildSubclassProc(HWND hwnd, UINT message,
 }
 
 }  // namespace alt
+

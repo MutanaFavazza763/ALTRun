@@ -107,6 +107,9 @@ private:
     void FocusFirstControl();
     void PlaceOnCursorMonitor();
     void DrawHeader(HDC dc) const;
+    void DrawPageChrome(HDC dc) const;
+    void DrawSection(HDC dc, const RECT& card, const std::wstring& title) const;
+    RECT NavItemRect(int index) const;
     // Posts BM_CLICK-like WM_COMMAND so button handling stays re-entrancy safe
     // when triggered from a child control subclass.
     void PostButtonCommand(int id) const;
@@ -144,6 +147,7 @@ private:
     // UTF-8 round-trip).
     std::vector<TextBinding> texts_;
     int current_page_ = kPageGeneral;
+    int nav_hover_ = -1;
 };
 
 }  // namespace alt

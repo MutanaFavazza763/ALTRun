@@ -1,7 +1,8 @@
 # ALTRun C++ 重写 —— 架构设计
 
 > 目标：用 **C++20 + 纯 Win32 + Direct2D/DirectWrite** 重写 Delphi 2007 的 ALTRun，
-> 保持功能 1:1 对齐，零第三方运行时依赖，绿色便携（配置与数据全部在 exe 同目录）。
+> 保持功能 1:1 对齐；主程序零第三方运行时依赖、绿色便携（配置与数据全部在 exe 同目录），
+> 设置与关于单独使用 WinUI 3（需系统 Windows App Runtime）。
 
 原始实现的行为细节由四份逆向规格文档固定下来，本文件只描述**重写后的结构**以及
 与原文的差异点：
@@ -58,13 +59,19 @@ src/
    ├─ AboutWindow.{h,cpp}   关于窗口（版本、内置三语言正文）
    ├─ MainWindow.{h,cpp}    启动器窗口：输入、结果列表、绘制、键盘/IME
    ├─ ParamWindow.{h,cpp}   参数提示窗：单行编辑 + 历史下拉 + 空闲取消
-   ├─ ConfigWindow.{h,cpp}  设置窗口：原生分页控件（4 页）+ 热键捕获
+   ├─ ConfigWindow.{h,cpp}  旧的原生设置窗口（仅在 WinUI 程序缺失时回退）
    ├─ ShortcutManagerWindow.{h,cpp}  快捷项管理器：四列 ListView + 拖拽排序 + 导入导出
    └─ ShortcutEditWindow.{h,cpp}     单条编辑对话框（参数模式、文件/目录选择、测试）
+└─ settings/                独立 WinUI 3 进程（C++/WinRT）
+   ├─ App.xaml/.cpp         单实例互斥量；第二实例激活已有窗口
+   ├─ MainWindow.xaml/.cpp  NavigationView 四页：常规/热键/外观/版本与路径
+   ├─ Project.idl           MainWindow runtimeclass，供 XAML 生成基类
+   └─ settings.rc           星形图标 + VERSIONINFO
 ```
 
 依赖方向严格单向：`ui → app → core`，`core` 不包含 `<windows.h>` 之外的 UI 头文件，
-便于日后为 `Matcher`/`ShortcutStore`/`Formatter` 添加单元测试。
+便于日后为 `Matcher`/`ShortcutStore`/`Formatter` 添加单元测试。`settings/` 是独立进程，
+只通过 `ALTRun.ini` 与窗口消息 `WM_APP+30` 和主程序协作，不链接主程序的 `app/ui` 静态库。
 
 ## 3. 数据模型（与原版一致）
 
@@ -171,22 +178,31 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | `'` | 执行显示编号 3 的项 |
 | `ExecuteIfOnlyOne=True` 且仅 1 条结果 | 立即执行（通过 `WM_APP+20` 延迟投递避免重入） |
 
-## 8. 设置窗口
+## 8. 设置窗口（WinUI 3）
 
-`ConfigWindow` 用**原生控件**实现（`SysTabControl32` + `BUTTON`/`EDIT`/`COMBOBOX`/`STATIC`），
-而不是像启动器那样 D2D 自绘——设置界面控件多、交互原生（键盘 Tab、输入法、下拉），
-用系统控件最稳、代码量最小；外观与启动器暗色风格不同（后续 M5 可统一主题）。
+2.1.0 起设置与关于由独立进程 `ALTRun.Settings.exe` 承载（`src/settings/`，
+C++/WinRT + XAML + NavigationView），而不是主程序内的原生分页控件。主程序在
+`App::OpenSettingsWindow()` 中先调用 `LaunchSettingsApp("general")`：
 
-- 四个页签：**常规**（13 个布尔项 + HideDelay/ParamHistoryLimit）、**热键**（三个捕获框）、
-  **外观**（宽度/透明度/圆角/ListFormat 下拉/Lang/背景图/4 个显示开关）、
-  **调试·关于**（版本、ini 路径、ShortCutRunCount、TraceEnable、数据文件说明）。
-- 生命周期：`Open()` 每次从 `Settings` 重新载入；`确定` = 写回 → `settings_.Save()` →
-  `App::ApplySettings()`（重注册三个热键、`ApplyAutoRun`、日志开关、主窗刷新）→ 隐藏；
-  `取消`/`Esc`/`WM_CLOSE` 只隐藏，不写盘。
-- 热键捕获：聚焦后按下组合键即捕获，格式化为 `Ctrl + Alt + Shift + Win + 键` 文本，
-  Delete 清空（`HotKey2` 空 = 禁用）；不可表示的键（媒体键、小键盘）忽略。
-- 数值输入容错：非法/空输入回退原值；按控件语义夹紧范围（Alpha 0–255、圆角 0–200、
-  FormWidth 200–800、HideDelay 0–3600、ParamHistoryLimit 0–1000）。
+- 同目录查找 `ALTRun.Settings.exe`，`ShellExecuteW(..., L"--page general", ...)`；
+- 返回 ≤32 或文件不存在时，回退到懒创建的原生 `ConfigWindow`；
+- `--about` 同理进入 `--page about`，失败才用原生 `AboutWindow`；
+- `LaunchSettingsApp` 不等待设置进程，主程序消息循环保持响应。
+
+设置进程保存后直接 `Settings::Save()`，再 `FindWindowW(L"ALTRun.MainWindow.v2")` 并
+`PostMessageW(main, WM_APP+30, 0, 0)`；主程序 `HandleExternalMessage` 收到后
+`settings_.Load(); ApplySettings();`，重注册热键、刷新外观并写日志。`WM_APP+30` 不能
+用 `WM_APP+20`——后者是 `ExecuteIfOnlyOne` 的自动执行消息，会被启动器截获。
+
+WinUI 侧四个页面：**常规**（13 个 ToggleSwitch + HideDelay/ParamHistoryLimit）、
+**热键**（三个只读捕获框）、**外观**（宽度/透明度/圆角/ListFormat/语言/背景图/开关）、
+**版本与路径**（版本、ini 路径、执行次数、TraceEnable、数据文件）。窗口 1000×720，
+Mica 背景 + 自定义 48 px 标题栏；`Project.idl` 声明 `MainWindow` runtimeclass，
+否则 XAML 生成的 `MainWindow_base` 找不到类型。
+
+热键捕获沿用主程序的 `Hotkey` 解析/格式化，保存时写回字符串；数值输入在 XAML 的
+`NumberBox` 上夹紧范围（Alpha 0–255、圆角 0–200、FormWidth 200–800、HideDelay 0–3600、
+ParamHistoryLimit 0–1000）。
 
 ## 9. 快捷项管理器
 
@@ -265,7 +281,7 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | D10 | `ParamHistory.txt` 写 `rank\|param`，读取容忍旧格式的末尾 `%` | 原版格式串 `'%-10d\|%-30s%'` 的孤立 `%` 很可能让保存永远抛异常（规格 U2），直接照抄会让参数历史失效 |
 | D11 | 最近项热键走 `WM_HOTKEY` 直接执行，参数项先弹参数窗 | 原版同样先取参数再执行；这里把"唤起窗口"改为"直接执行"，符合热键语义 |
 | D12 | `ExecuteIfOnlyOne` 用 `WM_APP+20` 延迟投递执行 | 在结果列表重建过程中同步执行会重入 `RefreshMatches`/`HideLauncher` |
-| D13 | 设置窗口用原生控件 + 4 个合并页签（原版 5 Tab + 1 隐藏 Tab） | 原生控件交互可靠、代码量小；合并后覆盖同一批配置键，仅布局不同 |
+| D13 | 设置与关于改为独立 WinUI 3 进程（原版与 2.0.x 都在主程序内） | 原生 WinUI 控件/主题/无障碍比自绘更完整；主程序保留原生核心与托盘，设置进程通过 ini + `WM_APP+30` 协作，缺失时回退原生窗口 |
 | D14 | 确定后**立即**应用热键/外观（原版部分项重启生效） | 更好的体验；`TraceEnable` 仍按原版提示"重启后生效" |
 | D15 | 管理器的空白分隔行可编辑（原版禁止） | 统一入口更方便；仍保留"两者都空=空白行"的语义 |
 | D16 | 重复检测跳过空白行；关键字也禁止 `\|` | 否则无法添加第二个分隔行；`\|` 会破坏存储格式 |
@@ -284,21 +300,25 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | D29 | 首次启动（无 ini）弹欢迎向导：语言、随 Windows 启动、发送到菜单 + 四条用法；默认语言取系统 UI 语言 | 原版首启只弹语言选择与两个系统集成询问，没有使用说明，用户不知道热键和参数星号；向导在选语言后才生成默认快捷项名，避免英文界面配中文默认名。接受后写 ini，因此只出现一次 |
 | D30 | 便携包里的样例配置命名 `ALTRun.ini.sample`，不随包提供可用的 `ALTRun.ini` | `Settings::Load()` 以 exe 同目录或 roaming 是否存在 `ALTRun.ini` 判断首次启动；包里放真实 ini 会让首启向导永远不弹。样例只供查键名，用户双击 exe 仍是干净首启 |
 | D31 | 托盘图标按 Windows 11 的通知区规则注册：启动重试 3 次、处理 `TaskbarCreated` 重建、首次把本 exe 的 `IsPromoted` 设为 1；无法注册时自动显示启动器 | Win11 把新图标默认塞进 `^` 溢出区，用户会以为程序没图标；`NotifyIconSettings\<hash>` 的 `IsPromoted=1` 才能常驻可见。只在没有显式值（或首次注册）时设一次，用户后来在“任务栏设置”里关掉（`IsPromoted=0`）不覆盖。若目录带 Low 完整性标签，低 IL 进程无法与 Explorer 通信（`Shell_NotifyIcon` 返回错误 5），此时显示主窗口避免“后台有进程但没有任何入口” |
+| D32 | `ALTRun.Settings.exe` 是 framework-dependent WinUI 3，不把 180 MB 的 Windows App SDK 自包含进包 | 自包含包实测 294 文件/180 MB（pdb 72 MB、onnxruntime 21 MB、DirectML 18.7 MB），对便携启动器不可接受；改为依赖已安装的 Windows App Runtime，缺失时主程序回退原生设置。干净机器需要先装运行时，写在 README/USAGE |
+| D33 | 首启向导的语言下拉改为自绘 Fluent 菜单按钮 | Win32 `COMBOBOX` 即使 `SetWindowTheme(Explorer)` 仍是经典 3D 边框，与卡片/开关不一致；改为 `fluent::CreateButton` + `fluent::ShowPopupMenu`，同时保留键盘操作 |
 
 ## 13. 构建、测试与打包
 
 ```powershell
 # 需要 Visual Studio（含 MSVC + Windows SDK）与 CMake ≥ 3.28
-cmake -S . -B build/vs -G "Visual Studio 18 2026" -A x64
-cmake --build build/vs --config Release
+cmake -S . -B build -G "Visual Studio 18 2026" -A x64
+cmake --build build --config Release --target ALTRun
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" `
+  src/settings/ALTRun.Settings.vcxproj /p:Configuration=Release /p:Platform=x64
 
-# 产物：build/vs/Release/ALTRun.exe + altRunTests.exe（res/ 会一并复制）
-.\build\vs\Release\ALTRun.exe --show      # 开发期直接展示启动器
-.\build\vs\Release\altRunTests.exe        # 核心单元测试（1045 项断言）
-ctest --test-dir build/vs -C Release      # 或通过 CTest 运行
+# 产物：build/Release/ALTRun.exe + build/settings/x64/Release/ALTRun.Settings.exe
+.\build\Release\ALTRun.exe --show         # 开发期直接展示启动器
+.\build\Release\altRunTests.exe           # 核心单元测试（1099 项断言）
+ctest --test-dir build -C Release         # 或通过 CTest 运行
 
-# 便携版打包（exe + res + 文档 + 样例 ALTRun.ini → dist/ALTRun-<版本>-win64.zip）
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -Version 2.0.6
+# 便携版打包（含 WinUI 设置程序与 xbf/pri/winmd/bootstrap）
+pwsh -NoProfile -File scripts/package.ps1 -Version 2.1.0
 ```
 
 或使用预设：`cmake --preset msvc-release` / `cmake --build --preset release`（Ninja）。

@@ -44,9 +44,16 @@ private:
                      int x, int y, int width, int height, int id);
     void ApplyFont(HWND control) const;
     void RefreshTexts();
+    void ShowLanguageMenu();
+    void UpdateLanguageButton();
     void PlaceOnCursorMonitor();
     void DrawHeader(HDC dc) const;
     void Accept();
+
+    static LRESULT CALLBACK ChildSubclassProc(HWND hwnd, UINT message,
+                                              WPARAM wparam, LPARAM lparam,
+                                              UINT_PTR /*subclass_id*/,
+                                              DWORD_PTR ref_data);
 
     Settings& settings_;
 
@@ -59,7 +66,8 @@ private:
     HWND intro_text_ = nullptr;
     HWND guide_text_ = nullptr;
     HWND language_label_ = nullptr;
-    HWND language_combo_ = nullptr;
+    HWND language_button_ = nullptr;
+    int language_index_ = 2;
     HWND auto_run_check_ = nullptr;
     HWND send_to_check_ = nullptr;
     HWND note_text_ = nullptr;

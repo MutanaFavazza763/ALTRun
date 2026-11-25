@@ -196,9 +196,33 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 验收：干净目录首启列表 32 项；托盘图标为原版黄色星形。证据：
 `07-evidence/tray/taskbar-star-206.png`、`07-evidence/defaults-206-runtime/`。
 
+## M12 — WinUI 3 设置与 Fluent 视觉（✅，2.1.0）
+
+- [x] 新建 `src/settings/`：C++/WinRT + WinUI 3 + XAML NavigationView，1000×720、
+      Mica、自定义标题栏；四页常规/热键/外观/版本与路径
+- [x] `Project.idl` 声明 `MainWindow` runtimeclass，解决 `MainWindow_base` 缺失；
+      vcxproj 加 Midl/ResourceCompile，`settings.rc` 提供星形图标与 VERSIONINFO
+- [x] 单实例互斥量 `ALTRun.Settings.SingleInstance.v1`；`--page`
+      直达页面；保存后 `WM_APP+30` 通知主程序 `Settings::Load + ApplySettings`
+- [x] 主程序 `LaunchSettingsApp` / `OpenSettingsWindow` / `OpenAboutWindow`；
+      `--config`、`--about`、托盘菜单优先 WinUI，缺 exe 回退原生
+- [x] 首启向导语言下拉改为 Fluent 菜单按钮；管理器 ListView 去 3D 边框、
+      Explorer 主题、10.5pt；编辑框沿用 Fluent 控件
+- [x] 版本统一 2.1.0：CMakeLists、package.ps1、AboutWindow/ConfigWindow、
+      WinUI 关于页、两个 exe 的 VERSIONINFO
+- [x] 打包脚本复制 `ALTRun.Settings.exe/pri/xbf/winmd/bootstrap`；
+      2.1.0 便携包 1.02 MB
+- [x] 验证：主程序/设置 0 error；1099 checks / 0 failure；四页真实运行；
+      保存后 ini 落盘与主程序重载日志
+
+验收：`--config` 打开 WinUI 设置，`--about` 打开版本页；保存后主程序立即应用。
+证据：`07-evidence/fluent-ui/settings-winui3-*.png`、`welcome-fluent-210-v3.png`、
+`manager-fluent-210-v2.png`。
+
 ## 后续可选增强（⏳）
 
-- [ ] `frmLang` 语言下拉框（现在要手改 `[GUI] Lang`）
 - [ ] 管理器窗口尺寸/列宽记忆（原版 `ManWin*`/`ManColWidth*`）
-- [ ] 单实例唤醒时复用已运行实例（`HandleID` 消息）
+- [x] 设置/向导语言下拉（2.1.0 已由 WinUI ComboBox 与 Fluent 菜单实现）
+- [ ] 单实例唤醒时复用已运行实例（`HandleID` 消息）；WinUI 设置双开激活待实测
+- [ ] 干净机器缺 Windows App Runtime 时的预检/安装引导
 - [ ] GitHub Actions CI 与代码签名

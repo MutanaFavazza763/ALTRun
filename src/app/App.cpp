@@ -13,6 +13,7 @@
 #include "core/Logger.h"
 #include "core/Text.h"
 #include "resource_ids.h"
+#include "ui/FluentMenu.h"
 
 namespace alt {
 namespace {
@@ -26,6 +27,7 @@ constexpr UINT kHotkeyIdLastItem = 2;
 
 constexpr UINT kTrayCallbackMessage = WM_APP + 10;
 constexpr UINT kShowMessage = WM_APP + 11;
+constexpr UINT kSettingsChangedMessage = WM_APP + 30;
 
 constexpr UINT kTrayMenuShow = 100;
 constexpr UINT kTrayMenuConfig = 101;
@@ -253,13 +255,8 @@ int App::Run() {
     last_item_spec_ = ParseHotkey(settings_.last_item_hotkey);
     RegisterHotkeys();
 
-    // Settings dialog: the tray menu opens it; OK re-applies hotkeys and the
-    // launcher window's appearance.
-    if (config_window_.CreateConfigWindow(instance_)) {
-        config_window_.SetApplyHandler([this]() { ApplySettings(); });
-    } else {
-        Logger::Instance().Warn("cannot create settings window");
-    }
+    // Settings: the WinUI 3 process owns the full settings UI.  The native
+    // dialog is kept as a fallback and created lazily by OpenSettingsWindow().
 
     // Shortcut manager: edits are saved immediately, so the handler only has to
     // refresh the launcher's cached match list.
@@ -274,10 +271,8 @@ int App::Run() {
         Logger::Instance().Warn("cannot create shortcut manager window");
     }
 
-    // About window (tray menu "关于"): native controls, created once and reused.
-    if (!about_window_.CreateAboutWindow(instance_)) {
-        Logger::Instance().Warn("cannot create about window");
-    }
+    // About: shown by the WinUI 3 settings process when available; the native
+    // window is the fallback.
 
     // First launch (no ALTRun.ini anywhere): language + AutoRun / SendTo plus a
     // short usage guide.  Accepting writes the ini, so this shows exactly once.
@@ -310,14 +305,14 @@ int App::Run() {
     }
     ApplyAutoRun(settings_.auto_run);
 
-    if (HasFlag(L"--config") && config_window_.hwnd() != nullptr) {
-        config_window_.Open();
+    if (HasFlag(L"--config")) {
+        OpenSettingsWindow();
     }
     if (HasFlag(L"--manager") && manager_window_.hwnd() != nullptr) {
         manager_window_.Open();
     }
-    if (HasFlag(L"--about") && about_window_.hwnd() != nullptr) {
-        about_window_.Open();
+    if (HasFlag(L"--about")) {
+        OpenAboutWindow();
     }
 
     if (show_welcome && welcome_window_.hwnd() != nullptr) {
@@ -410,6 +405,12 @@ LRESULT App::HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam,
             EnsureLauncherOnCurrentDesktop();
             main_window_.ShowLauncher();
             return 0;
+        case kSettingsChangedMessage:
+            // ALTRun.Settings.exe writes the same ALTRun.ini and then posts
+            // this message back to the launcher window.
+            settings_.Load();
+            ApplySettings();
+            return 0;
         case kTrayCallbackMessage:
             OnTrayCallback(lparam);
             return 0;
@@ -425,14 +426,10 @@ LRESULT App::HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam,
                     }
                     return 0;
                 case kTrayMenuConfig:
-                    if (config_window_.hwnd() != nullptr) {
-                        config_window_.Open();
-                    }
+                    OpenSettingsWindow();
                     return 0;
                 case kTrayMenuAbout:
-                    if (about_window_.hwnd() != nullptr) {
-                        about_window_.Open();
-                    }
+                    OpenAboutWindow();
                     return 0;
                 case kTrayMenuExit:
                     RequestExit();
@@ -470,29 +467,96 @@ void App::OnTrayCallback(LPARAM lparam) {
     }
 }
 
+bool App::LaunchSettingsApp(const wchar_t* page) {
+    const std::wstring executable = ExePath();
+    const size_t slash = executable.find_last_of(L"\\/");
+    if (slash == std::wstring::npos) {
+        return false;
+    }
+    const std::wstring directory = executable.substr(0, slash);
+    const std::wstring target = directory + L"\\ALTRun.Settings.exe";
+    const std::wstring required[] = {
+        target,
+        directory + L"\\ALTRun.Settings.pri",
+        directory + L"\\App.xbf",
+        directory + L"\\MainWindow.xbf",
+        directory + L"\\ALTRunSettings.winmd",
+        directory + L"\\Microsoft.WindowsAppRuntime.Bootstrap.dll",
+    };
+    for (const std::wstring& file : required) {
+        if (::GetFileAttributesW(file.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            Logger::Instance().Info(
+                "WinUI settings payload incomplete, using native settings");
+            return false;
+        }
+    }
+    const std::wstring arguments =
+        L"--page " + std::wstring(page != nullptr ? page : L"general");
+    const HINSTANCE result = ::ShellExecuteW(nullptr, L"open", target.c_str(),
+                                             arguments.c_str(), directory.c_str(),
+                                             SW_SHOWNORMAL);
+    if (reinterpret_cast<INT_PTR>(result) <= 32) {
+        Logger::Instance().Warn("cannot start ALTRun.Settings.exe");
+        return false;
+    }
+    Logger::Instance().Info("opened WinUI settings: " + ToUtf8(arguments));
+    return true;
+}
+
+void App::OpenSettingsWindow() {
+    if (LaunchSettingsApp(L"general")) {
+        return;
+    }
+    if (config_window_.hwnd() == nullptr) {
+        if (!config_window_.CreateConfigWindow(instance_)) {
+            Logger::Instance().Warn("cannot create native settings window");
+            return;
+        }
+        config_window_.SetApplyHandler([this]() { ApplySettings(); });
+    }
+    config_window_.Open();
+}
+
+void App::OpenAboutWindow() {
+    if (LaunchSettingsApp(L"about")) {
+        return;
+    }
+    if (about_window_.hwnd() == nullptr &&
+        !about_window_.CreateAboutWindow(instance_)) {
+        Logger::Instance().Warn("cannot create about window");
+        return;
+    }
+    about_window_.Open();
+}
+
 void App::ShowTrayMenu() {
     // app must not depend on ui/UiText.h (layering is ui -> app -> core), so the
     // lookup goes straight through Localization here.
     const Localization& text = Localization::Instance();
-    HMENU menu = ::CreatePopupMenu();
-    ::AppendMenuW(menu, MF_STRING, kTrayMenuShow,
-                  text.Get("resMenuShow").c_str());
-    ::AppendMenuW(menu, MF_STRING, kTrayMenuManager,
-                  text.Get("resMenuManager").c_str());
-    ::AppendMenuW(menu, MF_STRING, kTrayMenuConfig,
-                  text.Get("resMenuConfig").c_str());
-    ::AppendMenuW(menu, MF_STRING, kTrayMenuAbout,
-                  text.Get("Common.MenuAbout").c_str());
-    ::AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-    ::AppendMenuW(menu, MF_STRING, kTrayMenuExit,
-                  text.Get("Common.MenuClose").c_str());
+    std::vector<fluent::MenuItem> items = {
+        {kTrayMenuShow, text.Get("resMenuShow"), L"\u25A4", false, false, true},
+        {kTrayMenuManager, text.Get("resMenuManager"), L"\u2630", false, false,
+         true},
+        {kTrayMenuConfig, text.Get("resMenuConfig"), L"\u2699", false, false,
+         true},
+        {kTrayMenuAbout, text.Get("Common.MenuAbout"), L"\u2139", false, false,
+         true},
+        {0, L"", L"", true, false, false},
+        {kTrayMenuExit, text.Get("Common.MenuClose"), L"\u2715", false, true,
+         true},
+    };
 
     POINT cursor = {};
     ::GetCursorPos(&cursor);
     ::SetForegroundWindow(main_window_.hwnd());
-    ::TrackPopupMenu(menu, TPM_LEFTBUTTON | TPM_RIGHTBUTTON, cursor.x, cursor.y, 0,
-                     main_window_.hwnd(), nullptr);
-    ::DestroyMenu(menu);
+    HICON icon = ::LoadIconW(instance_, MAKEINTRESOURCEW(IDI_ALTRUN));
+    const int command = fluent::ShowPopupMenu(
+        main_window_.hwnd(), instance_, cursor, L"ALTRun",
+        text.Get("resTrayTip"), icon, items);
+    if (command != 0) {
+        ::PostMessageW(main_window_.hwnd(), WM_COMMAND,
+                       MAKEWPARAM(command, 0), 0);
+    }
 }
 
 bool App::AddTrayIcon() {
@@ -673,3 +737,4 @@ void App::ApplyAutoRun(bool enabled) {
 }
 
 }  // namespace alt
+

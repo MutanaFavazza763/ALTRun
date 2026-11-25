@@ -114,18 +114,25 @@ ALTRun 是一个 Windows 快速启动器：按 `Alt + R` 唤出输入框，输�
 命令行里可以用参数占位符，例如 `cmd /k %p`、`http://www.baidu.com/s?wd={%c}`
 （`{%c}` = 剪贴板，`{%wd}`/`{%wt}`/`{%wc}` = 前台窗口句柄/标题/类名）。
 
-## 7. 设置窗口
+## 7. 设置与关于（WinUI 3）
 
-托盘菜单 →"设置"，或启动参数 `ALTRun.exe --config`。四个页签：
+托盘菜单 →“设置/关于”，或启动参数 `ALTRun.exe --config` / `--about`。设置窗口由同目录的
+`ALTRun.Settings.exe` 承载，四个 WinUI 导航页：
 
 | 页签 | 内容 |
 |---|---|
 | 常规 | 正则匹配、任意位置匹配、数字键、列编号从 0 开始、记住最近匹配、仅显示前 10 项、仅剩一项立即执行、执行后退出、显示命令行/操作提示、开机自启、发送到菜单、启动显示窗口、隐藏延时（秒）、参数历史条数 |
 | 热键 | 主热键 / 辅助热键 / 最近项热键，点进输入框后直接按组合键即可捕获，`Delete` 清空（辅助热键留空 = 禁用） |
 | 外观 | 窗口宽度、不透明度（0-255）、圆角半径、列表格式（`%-25s\| %s`、`%s (%s)`、`%s [%s]` 或自定义）、语言、背景图文件名、皮肤/托盘/提示音/启动提示开关 |
-| 调试·关于 | 版本、ini 路径、累计执行次数、TraceEnable、各数据文件路径 |
+| 版本与路径 | 版本号、ini 路径、累计执行次数、TraceEnable、各数据文件路径 |
 
-点"确定"立即生效（热键、透明度、宽度、隐藏延时等）并写回 `ALTRun.ini`；"取消"不保存。
+点“保存”写回 `ALTRun.ini`，并向已运行的主程序发送 `WM_APP+30`，热键、透明度、宽度、
+隐藏延时等立即生效；“取消”关闭窗口且不保存。`ALTRun.Settings.exe --page
+general|hotkey|appearance|about` 可直达指定页。
+
+设置程序是 framework-dependent 的 WinUI 3 应用，需要系统已安装 **Windows App Runtime
+1.7+ / 2.x**；干净机器请先装运行时。若 `ALTRun.Settings.exe` 不存在，主程序会回退到旧的
+原生设置/关于窗口，功能仍可用。
 
 ## 8. 托盘与开机自启
 
@@ -165,23 +172,29 @@ Lang=zh_cn
 
 ## 10. 已知限制
 
-- 设置界面与快捷项管理器使用系统原生控件（浅色），与启动器的暗色皮肤不同；
+- 启动器仍使用暗色 D2D 面板；设置/关于为 WinUI 3，首启向导、管理器与编辑框为自绘浅色
+  Fluent 控件，三套窗口的标题栏与背景不完全一致；
 - 语言由 `[GUI] Lang` 决定，只支持三种内置值：
   `zh_cn`（简体中文）、`zh_hk`（繁体中文）、`en_us`（英语）。
   所有界面文案都已内置，**不会读取** exe 旁的 `.lang` 或 `About.<Lang>` 文件；
   旧配置里的 `EN`、`简体中文`、`繁体中文` 会自动迁移成新值，未知值回退 `en_us`。
-  可到"外观"页输入这三个值之一，当前还没有语言下拉框；
+  设置“外观”页和首启向导都提供语言菜单；
 - 托盘图标在 Win11 首次注册会自动常驻；如果目录带 Low 完整性标签（沙箱拷贝常见），
   Shell 会拒绝图标与 SendTo，移动目录即可恢复，程序也会自动显示启动器而不是静默驻留；
-- 管理器窗口尺寸与列宽暂时固定（原版的记忆功能列入后续增强）。
+- 管理器窗口尺寸与列宽暂时固定（原版的记忆功能列入后续增强）；
+- WinUI 设置程序依赖 Windows App Runtime；它缺失时主程序只能回退原生窗口，无法自行安装运行时。
 
 ## 11. 从源码构建
 
 ```powershell
-cmake -S . -B build/vs -G "Visual Studio 18 2026" -A x64
-cmake --build build/vs --config Release
-# 产物：build/vs/Release/ALTRun.exe
+cmake -S . -B build -G "Visual Studio 18 2026" -A x64
+cmake --build build --config Release --target ALTRun
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" `
+  src/settings/ALTRun.Settings.vcxproj /p:Configuration=Release /p:Platform=x64
+# 主程序：build/Release/ALTRun.exe
+# 设置：  build/settings/x64/Release/ALTRun.Settings.exe
 ```
 
-需要 Visual Studio（MSVC + Windows SDK）与 CMake ≥ 3.28。技术细节见
-[ARCHITECTURE.md](ARCHITECTURE.md)，进度见 [ROADMAP.md](ROADMAP.md)。
+两者必须同目录。需要 Visual Studio（MSVC + Windows SDK）、CMake ≥ 3.28 与
+Windows App Runtime 1.7+/2.x。技术细节见 [ARCHITECTURE.md](ARCHITECTURE.md)，
+进度见 [ROADMAP.md](ROADMAP.md)。

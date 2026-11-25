@@ -37,18 +37,19 @@ constexpr UINT kCaretBlinkMs = 530;
 // posting avoids re-entrancy while the result list is being rebuilt.
 constexpr UINT kMessageAutoExecute = WM_APP + 20;
 
-const D2D1_COLOR_F kBackground = D2D1::ColorF(0.102f, 0.110f, 0.125f, 1.0f);
-// Semi-transparent panel painted on top of the skin bitmap so the text stays
-// readable; the opacity is a compromise between the original solid look and
-// letting the skin show through.
-const D2D1_COLOR_F kPanelOverlay = D2D1::ColorF(0.102f, 0.110f, 0.125f, 0.74f);
-const D2D1_COLOR_F kBorder = D2D1::ColorF(0.239f, 0.255f, 0.290f, 1.0f);
-const D2D1_COLOR_F kSelected = D2D1::ColorF(0.161f, 0.290f, 0.435f, 1.0f);
-const D2D1_COLOR_F kHover = D2D1::ColorF(0.145f, 0.157f, 0.176f, 1.0f);
-const D2D1_COLOR_F kTextBright = D2D1::ColorF(0.925f, 0.937f, 0.957f, 1.0f);
-const D2D1_COLOR_F kTextDim = D2D1::ColorF(0.541f, 0.569f, 0.612f, 1.0f);
-const D2D1_COLOR_F kAccent = D2D1::ColorF(0.361f, 0.659f, 0.988f, 1.0f);
-const D2D1_COLOR_F kCaret = D2D1::ColorF(0.361f, 0.659f, 0.988f, 1.0f);
+const D2D1_COLOR_F kBackground = D2D1::ColorF(0.953f, 0.972f, 0.996f, 1.0f);
+// A light translucent panel painted on top of the optional skin bitmap keeps
+// the Fluent look readable without discarding the original skin feature.
+const D2D1_COLOR_F kPanelOverlay = D2D1::ColorF(0.976f, 0.988f, 1.0f, 0.88f);
+const D2D1_COLOR_F kBorder = D2D1::ColorF(0.839f, 0.878f, 0.925f, 1.0f);
+const D2D1_COLOR_F kSelected = D2D1::ColorF(0.800f, 0.894f, 1.0f, 1.0f);
+const D2D1_COLOR_F kHover = D2D1::ColorF(0.918f, 0.949f, 0.988f, 1.0f);
+const D2D1_COLOR_F kTextBright = D2D1::ColorF(0.094f, 0.110f, 0.129f, 1.0f);
+const D2D1_COLOR_F kTextDim = D2D1::ColorF(0.357f, 0.388f, 0.431f, 1.0f);
+const D2D1_COLOR_F kAccent = D2D1::ColorF(0.000f, 0.471f, 0.839f, 1.0f);
+const D2D1_COLOR_F kCaret = D2D1::ColorF(0.000f, 0.471f, 0.839f, 1.0f);
+const D2D1_COLOR_F kInputFill = D2D1::ColorF(1.0f, 1.0f, 1.0f, 1.0f);
+const D2D1_COLOR_F kAccentSoft = D2D1::ColorF(0.839f, 0.914f, 1.0f, 1.0f);
 
 // Localized resource lookup lives in ui/UiText.h so every window shares it
 // (see core/Localization; original key names are documented in
@@ -103,7 +104,7 @@ void MainWindow::OnCreate() {
 
     const DWORD corner_pref = 2;  // DWMWCP_ROUND (Windows 11)
     ::DwmSetWindowAttribute(hwnd_, 33, &corner_pref, sizeof(corner_pref));
-    const BOOL dark = TRUE;
+    const BOOL dark = FALSE;
     ::DwmSetWindowAttribute(hwnd_, 20, &dark, sizeof(dark));
 }
 
@@ -438,7 +439,7 @@ float MainWindow::MeasureWidth(const std::wstring& text,
 
 D2D1_RECT_F MainWindow::InputRect() const {
     const float top = kPad + kHeaderHeight;
-    return D2D1::RectF(kPad + 8.0f, top, settings_.form_width - kPad - 8.0f,
+    return D2D1::RectF(kPad + 14.0f, top, settings_.form_width - kPad - 14.0f,
                        top + kInputHeight);
 }
 
@@ -489,8 +490,13 @@ void MainWindow::DrawFrame() {
     }
     d2d_.DrawRoundedBorder(frame, radius, kBorder, 1.0f);
 
+    d2d_.DrawTextBlock(L"\u2726", title_format_.Get(),
+                       D2D1::RectF(kPad, kPad, kPad + 18.0f,
+                                   kPad + kHeaderHeight),
+                       kAccent);
     d2d_.DrawTextBlock(Loc("resTitle"), title_format_.Get(),
-                       D2D1::RectF(kPad, kPad, width - kPad, kPad + kHeaderHeight),
+                       D2D1::RectF(kPad + 22.0f, kPad, width - kPad,
+                                   kPad + kHeaderHeight),
                        kAccent);
     const std::wstring count = FormatCount(Loc("resItemCount"), store_.item_count());
     IDWriteTextFormat* right = title_format_.Get();
@@ -499,6 +505,14 @@ void MainWindow::DrawFrame() {
                        D2D1::RectF(kPad, kPad, width - kPad, kPad + kHeaderHeight),
                        kTextDim);
     right->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+
+    // Fluent search field: a white rounded surface instead of bare text on the
+    // old dark panel.
+    const D2D1_RECT_F search =
+        D2D1::RectF(kPad, kPad + kHeaderHeight, width - kPad,
+                    kPad + kHeaderHeight + kInputHeight);
+    d2d_.FillRoundedRect(search, 10.0f, kInputFill);
+    d2d_.DrawRoundedBorder(search, 10.0f, kBorder, 1.0f);
 
     // Query line with caret.
     const D2D1_RECT_F input = InputRect();
@@ -582,6 +596,10 @@ void MainWindow::DrawRows() {
             d2d_.FillRoundedRect(
                 D2D1::RectF(rect.left, rect.top + 2.0f, rect.right, rect.bottom - 2.0f),
                 radius, kSelected);
+            d2d_.FillRoundedRect(
+                D2D1::RectF(rect.left + 1.0f, rect.top + 7.0f,
+                            rect.left + 4.0f, rect.bottom - 7.0f),
+                1.5f, kAccent);
         } else if (is_hover) {
             d2d_.FillRoundedRect(rect, 6.0f, kHover);
         }
@@ -604,6 +622,11 @@ void MainWindow::DrawFooter() {
     const float rows_top = kPad + kHeaderHeight + kInputHeight;
     const float detail_top = rows_top + VisibleRows() * kRowHeight;
     const float hint_top = detail_top + kDetailHeight;
+
+    d2d_.FillRect(D2D1::RectF(kPad + 4.0f, detail_top - 5.0f,
+                              static_cast<float>(settings_.form_width) - kPad - 4.0f,
+                              detail_top - 4.0f),
+                  kBorder);
 
     // Selected item detail: name + command line (ShowCommandLine).
     if (settings_.show_command_line && !matches_.empty() && selected_ >= 0 &&

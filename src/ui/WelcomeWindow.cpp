@@ -1,40 +1,52 @@
 #include "ui/WelcomeWindow.h"
 
+#include <commctrl.h>
 #include <dwmapi.h>
+#include <uxtheme.h>
+#pragma comment(lib, "uxtheme.lib")
+#include <windowsx.h>
 
 #include <string>
+#include <vector>
 
 #include "core/Localization.h"
 #include "core/Logger.h"
 #include "core/Text.h"
+#include "ui/FluentMenu.h"
+#include "ui/FluentTheme.h"
 #include "ui/UiText.h"
 
 namespace alt {
 namespace {
 
-constexpr wchar_t kWindowClass[] = L"ALTRun.WelcomeWindow.v2";
+constexpr wchar_t kWindowClass[] = L"ALTRun.WelcomeWindow.v3";
 
 // Layout in 96-DPI design units (scaled through WelcomeWindow::S()).
-constexpr int kWindowWidth = 470;
-constexpr int kWindowHeight = 430;
-constexpr int kHeaderHeight = 44;
-constexpr int kMargin = 20;
+constexpr int kWindowWidth = 560;
+constexpr int kWindowHeight = 520;
+constexpr int kHeaderHeight = 56;
+constexpr int kMargin = 24;
 constexpr int kContentWidth = kWindowWidth - 2 * kMargin;
 
-constexpr int kIntroY = 54;
-constexpr int kGuideY = 84;
-constexpr int kGuideHeight = 96;
-constexpr int kLanguageLabelY = 198;
-constexpr int kLanguageComboY = 194;
-constexpr int kAutoRunY = 236;
-constexpr int kSendToY = 266;
-constexpr int kNoteY = 302;
-constexpr int kNoteHeight = 44;
-constexpr int kButtonWidth = 150;
-constexpr int kButtonHeight = 32;
-constexpr int kButtonY = 378;
+constexpr int kCardTop = 72;
+constexpr int kCardBottom = 436;
+constexpr int kIntroY = 96;
+constexpr int kGuideY = 138;
+constexpr int kGuideHeight = 98;
+constexpr int kLanguageLabelY = 244;
+constexpr int kLanguageComboY = 272;
+constexpr int kAutoRunY = 320;
+constexpr int kSendToY = 356;
+constexpr int kNoteY = 396;
+constexpr int kNoteHeight = 48;
+constexpr int kButtonWidth = 160;
+constexpr int kButtonHeight = 36;
+constexpr int kButtonY = 456;
+constexpr int kFooterTop = 448;
 
 constexpr int kIdStart = IDOK;
+constexpr int kIdLanguage = 3001;
+constexpr int kIdLanguageFirst = 3100;
 
 const wchar_t* const kLanguageNames[3] = {L"简体中文", L"繁體中文", L"English"};
 const char* const kLanguageValues[3] = {"zh_cn", "zh_hk", "en_us"};
@@ -57,8 +69,7 @@ WelcomeWindow::~WelcomeWindow() { DestroyResources(); }
 
 bool WelcomeWindow::CreateWelcomeWindow(HINSTANCE instance) {
     if (!Create(instance, kWindowClass, Loc("resWelcomeTitle"),
-                WS_POPUP | WS_CLIPCHILDREN,
-                WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) {
+                WS_POPUP, WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) {
         return false;
     }
     const DWORD corner_preference = 2;  // DWMWCP_ROUND (Windows 11), best effort
@@ -78,7 +89,7 @@ void WelcomeWindow::CreateFonts() {
                                 static_cast<UINT>(sizeof(metrics)), &metrics,
                                 0) != FALSE) {
         LOGFONTW log_font = metrics.lfMessageFont;
-        log_font.lfHeight = -::MulDiv(9, dpi_, 72);
+        log_font.lfHeight = -::MulDiv(21, dpi_, 144);
         font_ = ::CreateFontIndirectW(&log_font);
     }
     if (font_ == nullptr) {
@@ -134,37 +145,50 @@ HWND WelcomeWindow::MakeControl(const wchar_t* class_name, const wchar_t* text,
 
 void WelcomeWindow::CreateControls() {
     intro_text_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
-                              kMargin, kIntroY, kContentWidth, 24, 0);
+                              kMargin + 72, kIntroY, kContentWidth - 96, 30, 0);
     guide_text_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
-                              kMargin, kGuideY, kContentWidth, kGuideHeight, 0);
+                              kMargin + 24, kGuideY, kContentWidth - 48,
+                              kGuideHeight, 0);
 
     language_label_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
-                                   kMargin, kLanguageLabelY, 110, 24, 0);
-    language_combo_ = MakeControl(
-        WC_COMBOBOXW, L"",
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
-        kMargin + 120, kLanguageComboY, 190, 200, 0);
-    if (language_combo_ != nullptr) {
-        for (const wchar_t* name : kLanguageNames) {
-            ::SendMessageW(language_combo_, CB_ADDSTRING, 0,
-                           reinterpret_cast<LPARAM>(name));
-        }
+                                   kMargin + 24, kLanguageLabelY, 160, 24, 0);
+    language_button_ = fluent::CreateButton(
+        hwnd_, instance_, kIdLanguage, L"", font_, 220, 34, dpi_, false);
+    if (language_button_ != nullptr) {
+        ::SetWindowPos(language_button_, nullptr, S(kMargin + 24),
+                       S(kLanguageComboY), 0, 0, SWP_NOSIZE | SWP_NOZORDER);
     }
 
-    auto_run_check_ = MakeControl(WC_BUTTONW, L"",
-                                  WS_CHILD | WS_VISIBLE | WS_TABSTOP |
-                                      BS_AUTOCHECKBOX,
-                                  kMargin, kAutoRunY, kContentWidth, 24, 0);
-    send_to_check_ = MakeControl(WC_BUTTONW, L"",
-                                 WS_CHILD | WS_VISIBLE | WS_TABSTOP |
-                                     BS_AUTOCHECKBOX,
-                                 kMargin, kSendToY, kContentWidth, 24, 0);
+    auto_run_check_ = fluent::CreateToggle(
+        hwnd_, instance_, 0, L"", font_, kContentWidth - 48, 30, dpi_);
+    send_to_check_ = fluent::CreateToggle(
+        hwnd_, instance_, 0, L"", font_, kContentWidth - 48, 30, dpi_);
+    if (auto_run_check_ != nullptr) {
+        ::SetWindowPos(auto_run_check_, nullptr, S(kMargin + 24), S(kAutoRunY),
+                       0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        ::SetWindowSubclass(auto_run_check_, &WelcomeWindow::ChildSubclassProc, 2,
+                            reinterpret_cast<DWORD_PTR>(this));
+    }
+    if (send_to_check_ != nullptr) {
+        ::SetWindowPos(send_to_check_, nullptr, S(kMargin + 24), S(kSendToY),
+                       0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        ::SetWindowSubclass(send_to_check_, &WelcomeWindow::ChildSubclassProc, 2,
+                            reinterpret_cast<DWORD_PTR>(this));
+    }
+
     note_text_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
-                             kMargin, kNoteY, kContentWidth, kNoteHeight, 0);
-    start_button_ = MakeControl(
-        WC_BUTTONW, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-        kWindowWidth - kMargin - kButtonWidth, kButtonY, kButtonWidth,
-        kButtonHeight, kIdStart);
+                             kMargin + 24, kNoteY, kContentWidth - 48,
+                             kNoteHeight, 0);
+    start_button_ = fluent::CreateButton(
+        hwnd_, instance_, kIdStart, L"", font_, kButtonWidth, kButtonHeight, dpi_,
+        true);
+    if (start_button_ != nullptr) {
+        ::SetWindowPos(start_button_, nullptr,
+                       S(kWindowWidth - kMargin - kButtonWidth), S(kButtonY), 0,
+                       0, SWP_NOSIZE | SWP_NOZORDER);
+        ::SetWindowSubclass(start_button_, &WelcomeWindow::ChildSubclassProc, 2,
+                            reinterpret_cast<DWORD_PTR>(this));
+    }
 }
 
 void WelcomeWindow::RefreshTexts() {
@@ -189,6 +213,15 @@ void WelcomeWindow::RefreshTexts() {
                      text.Get("resWelcomeSendTo").c_str());
     ::SetWindowTextW(note_text_, text.Get("resWelcomeNote").c_str());
     ::SetWindowTextW(start_button_, text.Get("resWelcomeStart").c_str());
+    if (start_button_ != nullptr) {
+        ::InvalidateRect(start_button_, nullptr, TRUE);
+    }
+    if (auto_run_check_ != nullptr) {
+        ::InvalidateRect(auto_run_check_, nullptr, TRUE);
+    }
+    if (send_to_check_ != nullptr) {
+        ::InvalidateRect(send_to_check_, nullptr, TRUE);
+    }
 
     int index = 2;  // en_us
     if (settings_.lang == "zh_cn") {
@@ -196,7 +229,8 @@ void WelcomeWindow::RefreshTexts() {
     } else if (settings_.lang == "zh_hk") {
         index = 1;
     }
-    ::SendMessageW(language_combo_, CB_SETCURSEL, index, 0);
+    language_index_ = index;
+    UpdateLanguageButton();
     ::SendMessageW(auto_run_check_, BM_SETCHECK,
                    settings_.auto_run ? BST_CHECKED : BST_UNCHECKED, 0);
     ::SendMessageW(send_to_check_, BM_SETCHECK,
@@ -256,24 +290,65 @@ void WelcomeWindow::DrawHeader(HDC dc) const {
     }
     RECT client = {};
     ::GetClientRect(hwnd_, &client);
+    fluent::FillBackground(dc, client);
+    fluent::DrawTitleBar(dc, hwnd_, Loc("resWelcomeTitle"), title_font_,
+                         S(kHeaderHeight));
 
+    RECT card = {S(kMargin), S(kCardTop), S(kWindowWidth - kMargin),
+                 S(kCardBottom)};
+    fluent::DrawCard(dc, card, S(14));
+
+    RECT footer = {S(kMargin), S(kFooterTop), S(kWindowWidth - kMargin),
+                   S(kFooterTop + 48)};
+    fluent::FillRounded(dc, footer, S(10), fluent::kSurface);
+    fluent::StrokeRounded(dc, footer, S(10), fluent::kBorder);
+
+    // A small accent tile makes the first-run page feel like a welcome card
+    // rather than a plain form.
+    RECT tile = {S(kMargin + 24), S(kCardTop + 24), S(kMargin + 56),
+                 S(kCardTop + 56)};
+    fluent::FillRounded(dc, tile, S(10), fluent::kAccentSoft);
     ::SetBkMode(dc, TRANSPARENT);
-    ::SetTextColor(dc, ::GetSysColor(COLOR_BTNTEXT));
-    HGDIOBJ previous = ::SelectObject(dc, title_font_);
-    RECT title = {S(20), S(8), client.right - S(20), S(kHeaderHeight - 6)};
-    const std::wstring header = Loc("resWelcomeTitle");
-    ::DrawTextW(dc, header.c_str(), -1, &title,
-                DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
-    ::SelectObject(dc, previous);
+    ::SetTextColor(dc, fluent::kAccent);
+    HGDIOBJ old = ::SelectObject(dc, title_font_);
+    RECT glyph = tile;
+    ::DrawTextW(dc, L"✦", -1, &glyph,
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+    ::SelectObject(dc, old);
+}
 
-    const RECT separator = {S(16), S(kHeaderHeight), client.right - S(16),
-                            S(kHeaderHeight) + 1};
-    ::FillRect(dc, &separator, ::GetSysColorBrush(COLOR_3DSHADOW));
+void WelcomeWindow::UpdateLanguageButton() {
+    if (language_button_ == nullptr) {
+        return;
+    }
+    std::wstring label = kLanguageNames[language_index_];
+    label += L"    \u25BE";
+    ::SetWindowTextW(language_button_, label.c_str());
+    ::InvalidateRect(language_button_, nullptr, TRUE);
+}
+
+void WelcomeWindow::ShowLanguageMenu() {
+    if (language_button_ == nullptr) {
+        return;
+    }
+    RECT button = {};
+    ::GetWindowRect(language_button_, &button);
+    POINT point = {button.left, button.bottom + 4};
+    std::vector<fluent::MenuItem> items;
+    for (int index = 0; index < 3; ++index) {
+        items.push_back({kIdLanguageFirst + index, kLanguageNames[index], L"",
+                         false, false, true});
+    }
+    const int command = fluent::ShowPopupMenu(
+        hwnd_, instance_, point, Loc("resWelcomeLanguage"), L"", nullptr, items);
+    if (command >= kIdLanguageFirst && command < kIdLanguageFirst + 3) {
+        language_index_ = command - kIdLanguageFirst;
+        UpdateLanguageButton();
+    }
 }
 
 void WelcomeWindow::Accept() {
-    int index = static_cast<int>(
-        ::SendMessageW(language_combo_, CB_GETCURSEL, 0, 0));
+    int index = language_index_;
     if (index < 0 || index > 2) {
         index = 2;
     }
@@ -295,10 +370,25 @@ void WelcomeWindow::Accept() {
 }
 
 LRESULT WelcomeWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
+    const int title_height = S(kHeaderHeight);
+    if (message == WM_NCHITTEST || message == WM_MOUSEMOVE ||
+        message == WM_MOUSELEAVE || message == WM_LBUTTONUP) {
+        const LRESULT chrome =
+            fluent::HandleChromeMessage(hwnd_, message, wparam, lparam,
+                                        title_height);
+        if (chrome != -1) {
+            return chrome;
+        }
+    }
+
     switch (message) {
         case WM_COMMAND:
             if (HIWORD(wparam) == BN_CLICKED && LOWORD(wparam) == kIdStart) {
                 Accept();
+                return 0;
+            }
+            if (HIWORD(wparam) == BN_CLICKED && LOWORD(wparam) == kIdLanguage) {
+                ShowLanguageMenu();
                 return 0;
             }
             return 0;
@@ -313,15 +403,8 @@ LRESULT WelcomeWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam)
                 return 0;
             }
             break;
-        case WM_ERASEBKGND: {
-            HDC dc = reinterpret_cast<HDC>(wparam);
-            RECT client = {};
-            ::GetClientRect(hwnd_, &client);
-            if (background_brush_ != nullptr) {
-                ::FillRect(dc, &client, background_brush_);
-            }
+        case WM_ERASEBKGND:
             return 1;
-        }
         case WM_PAINT: {
             PAINTSTRUCT paint = {};
             HDC dc = ::BeginPaint(hwnd_, &paint);
@@ -332,7 +415,16 @@ LRESULT WelcomeWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam)
         case WM_CTLCOLORSTATIC: {
             HDC dc = reinterpret_cast<HDC>(wparam);
             ::SetBkMode(dc, TRANSPARENT);
-            return reinterpret_cast<LRESULT>(background_brush_);
+            ::SetTextColor(dc, fluent::kText);
+            return reinterpret_cast<LRESULT>(
+                ::GetStockObject(HOLLOW_BRUSH));
+        }
+        case WM_CTLCOLOREDIT:
+        case WM_CTLCOLORLISTBOX: {
+            HDC dc = reinterpret_cast<HDC>(wparam);
+            ::SetBkColor(dc, fluent::kSurface);
+            ::SetTextColor(dc, fluent::kText);
+            return reinterpret_cast<LRESULT>(::GetStockObject(WHITE_BRUSH));
         }
         case WM_DESTROY:
             DestroyResources();
@@ -343,4 +435,22 @@ LRESULT WelcomeWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam)
     return Window::HandleMessage(message, wparam, lparam);
 }
 
+LRESULT CALLBACK WelcomeWindow::ChildSubclassProc(HWND hwnd, UINT message,
+                                                  WPARAM wparam, LPARAM lparam,
+                                                  UINT_PTR, DWORD_PTR ref_data) {
+    auto* self = reinterpret_cast<WelcomeWindow*>(ref_data);
+    if (self == nullptr) {
+        return ::DefSubclassProc(hwnd, message, wparam, lparam);
+    }
+    if (message == WM_KEYDOWN && wparam == VK_ESCAPE) {
+        ::PostMessageW(self->hwnd_, WM_CLOSE, 0, 0);
+        return 0;
+    }
+    if (message == WM_CHAR && wparam == L'\x1b') {
+        return 0;
+    }
+    return ::DefSubclassProc(hwnd, message, wparam, lparam);
+}
+
 }  // namespace alt
+

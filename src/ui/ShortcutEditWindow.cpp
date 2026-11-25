@@ -4,6 +4,7 @@
 #include <dwmapi.h>
 #include <objbase.h>
 #include <shobjidl.h>
+#include <windowsx.h>
 
 #include <iterator>
 #include <string>
@@ -14,23 +15,24 @@
 #include "core/Logger.h"
 #include "core/ShortcutSource.h"
 #include "core/Text.h"
+#include "ui/FluentTheme.h"
 #include "ui/UiText.h"
 
 namespace alt {
 namespace {
 
-constexpr wchar_t kWindowClass[] = L"ALTRun.ShortcutEditWindow.v2";
+constexpr wchar_t kWindowClass[] = L"ALTRun.ShortcutEditWindow.v3";
 
 // Layout in 96-DPI design units (scaled with ShortcutEditWindow::S()).
-constexpr int kWindowWidth = 560;
-constexpr int kWindowHeight = 360;
-constexpr int kHeaderHeight = 44;
+constexpr int kWindowWidth = 600;
+constexpr int kWindowHeight = 520;
+constexpr int kHeaderHeight = 48;
 constexpr int kMargin = 18;
-constexpr int kLabelWidth = 84;
-constexpr int kFieldX = kMargin + kLabelWidth + 10;
-constexpr int kFieldWidth = kWindowWidth - kFieldX - kMargin;
-constexpr int kRowHeight = 24;
-constexpr int kButtonHeight = 30;
+constexpr int kLabelWidth = 100;
+constexpr int kFieldX = 140;
+constexpr int kFieldWidth = 440;
+constexpr int kRowHeight = 28;
+constexpr int kButtonHeight = 34;
 
 constexpr int kIdKeyword = 1001;
 constexpr int kIdName = 1002;
@@ -147,8 +149,7 @@ bool ShortcutEditWindow::CreateEditWindow(HINSTANCE instance) {
     // parent background; WS_EX_TOPMOST/WS_EX_TOOLWINDOW match the other ALTRun
     // windows (no taskbar entry).
     if (!Create(instance, kWindowClass,
-                Loc("ShortCutForm.ShortCutFormCaption"),
-                WS_POPUP | WS_CLIPCHILDREN,
+                Loc("ShortCutForm.ShortCutFormCaption"), WS_POPUP,
                 WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) {
         return false;
     }
@@ -179,7 +180,7 @@ void ShortcutEditWindow::CreateFonts() {
 
     LOGFONTW title_log = {};
     if (::GetObjectW(font_, static_cast<int>(sizeof(title_log)), &title_log) != 0) {
-        title_log.lfHeight = static_cast<LONG>(title_log.lfHeight * 1.3);
+        title_log.lfHeight = -::MulDiv(12, dpi_, 72);
         title_log.lfWeight = FW_SEMIBOLD;
         title_font_ = ::CreateFontIndirectW(&title_log);
     }
@@ -225,79 +226,100 @@ HWND ShortcutEditWindow::MakeControl(const wchar_t* class_name,
 }
 
 void ShortcutEditWindow::CreateControls() {
-    MakeControl(WC_STATICW, Loc("resLabelKeyword"), WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
-                kMargin, 58, kLabelWidth, kRowHeight, 0);
+    MakeControl(WC_STATICW, Loc("resLabelKeyword"),
+                WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, kMargin + 18, 92,
+                kLabelWidth, kRowHeight, 0);
     keyword_edit_ = MakeControl(WC_EDITW, L"",
-                                WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_LEFT |
-                                    ES_AUTOHSCROLL,
-                                kFieldX, 58, kFieldWidth, kRowHeight, kIdKeyword);
+                                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER |
+                                    ES_LEFT | ES_AUTOHSCROLL,
+                                kFieldX, 92, kFieldWidth, kRowHeight, kIdKeyword);
 
-    MakeControl(WC_STATICW, Loc("resLabelName"), WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
-                kMargin, 90, kLabelWidth, kRowHeight, 0);
+    MakeControl(WC_STATICW, Loc("resLabelName"),
+                WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, kMargin + 18, 128,
+                kLabelWidth, kRowHeight, 0);
     name_edit_ = MakeControl(WC_EDITW, L"",
-                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_LEFT |
-                                 ES_AUTOHSCROLL,
-                             kFieldX, 90, kFieldWidth, kRowHeight, kIdName);
+                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER |
+                                 ES_LEFT | ES_AUTOHSCROLL,
+                             kFieldX, 128, kFieldWidth, kRowHeight, kIdName);
 
-    MakeControl(WC_STATICW, Loc("resLabelCommandLine"), WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
-                kMargin, 122, kLabelWidth, kRowHeight, 0);
+    MakeControl(WC_STATICW, Loc("resLabelCommandLine"),
+                WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, kMargin + 18, 164,
+                kLabelWidth, kRowHeight, 0);
     command_line_edit_ =
         MakeControl(WC_EDITW, L"",
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_LEFT | ES_AUTOHSCROLL,
-                    kFieldX, 122, kFieldWidth, kRowHeight, kIdCommandLine);
+                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER | ES_LEFT |
+                        ES_AUTOHSCROLL,
+                    kFieldX, 164, kFieldWidth, kRowHeight, kIdCommandLine);
 
-    MakeControl(WC_STATICW, Loc("resLabelParamType"), WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE,
-                kMargin, 158, kLabelWidth, kRowHeight, 0);
-    // The first radio carries WS_GROUP so arrow keys move inside the group and
-    // Tab leaves it again.
-    radio_none_ = MakeControl(WC_BUTTONW, Loc("resParamNone"),
-                              WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_GROUP |
-                                  BS_AUTORADIOBUTTON,
-                              kFieldX, 158, 100, kRowHeight, kIdParamNone);
-    radio_no_encoding_ = MakeControl(
-        WC_BUTTONW, Loc("resParamNoEncoding"),
-        WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON, kFieldX + 118, 158, 140,
-        kRowHeight, kIdParamNoEncoding);
-    radio_url_query_ = MakeControl(WC_BUTTONW, Loc("resParamUrlQuery"),
-                                   WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON,
-                                   kFieldX, 186, 100, kRowHeight, kIdParamUrlQuery);
-    radio_utf8_query_ = MakeControl(
-        WC_BUTTONW, Loc("resParamUtf8Query"),
-        WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON, kFieldX + 118, 186, 140,
-        kRowHeight, kIdParamUtf8Query);
+    MakeControl(WC_STATICW, Loc("resLabelParamType"),
+                WS_CHILD | WS_VISIBLE | SS_CENTERIMAGE, kMargin + 18, 206,
+                kLabelWidth, kRowHeight, 0);
+    radio_none_ = fluent::CreateRadio(hwnd_, instance_, kIdParamNone,
+                                      Loc("resParamNone"), font_, 160,
+                                      kRowHeight, dpi_);
+    radio_no_encoding_ = fluent::CreateRadio(
+        hwnd_, instance_, kIdParamNoEncoding, Loc("resParamNoEncoding"), font_,
+        170, kRowHeight, dpi_);
+    radio_url_query_ = fluent::CreateRadio(hwnd_, instance_, kIdParamUrlQuery,
+                                           Loc("resParamUrlQuery"), font_, 160,
+                                           kRowHeight, dpi_);
+    radio_utf8_query_ = fluent::CreateRadio(
+        hwnd_, instance_, kIdParamUtf8Query, Loc("resParamUtf8Query"), font_,
+        170, kRowHeight, dpi_);
+    if (radio_none_ != nullptr) {
+        ::SetWindowPos(radio_none_, nullptr, S(kFieldX), S(206), 0, 0,
+                       SWP_NOSIZE | SWP_NOZORDER);
+    }
+    if (radio_no_encoding_ != nullptr) {
+        ::SetWindowPos(radio_no_encoding_, nullptr, S(kFieldX + 164), S(206),
+                       0, 0, SWP_NOSIZE | SWP_NOZORDER);
+    }
+    if (radio_url_query_ != nullptr) {
+        ::SetWindowPos(radio_url_query_, nullptr, S(kFieldX), S(238), 0, 0,
+                       SWP_NOSIZE | SWP_NOZORDER);
+    }
+    if (radio_utf8_query_ != nullptr) {
+        ::SetWindowPos(radio_utf8_query_, nullptr, S(kFieldX + 164), S(238), 0,
+                       0, SWP_NOSIZE | SWP_NOZORDER);
+    }
 
-    pick_file_button_ = MakeControl(
-        WC_BUTTONW, Loc("resPickFile"),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, kFieldX, 222, 120,
-        kButtonHeight, kIdPickFile);
-    pick_folder_button_ = MakeControl(
-        WC_BUTTONW, Loc("resPickFolder"),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, kFieldX + 130, 222,
-        120, kButtonHeight, kIdPickFolder);
-    test_button_ = MakeControl(WC_BUTTONW, Loc("Common.BtnTest"),
-                               WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                               kFieldX + 260, 222, 84, kButtonHeight, kIdTest);
+    auto make_button = [this](int id, const std::wstring& text, int x, int y,
+                              int width, bool primary) {
+        HWND button = fluent::CreateButton(hwnd_, instance_, id, text, font_,
+                                           width, kButtonHeight, dpi_, primary);
+        if (button != nullptr) {
+            ::SetWindowPos(button, nullptr, S(x), S(y), 0, 0,
+                           SWP_NOSIZE | SWP_NOZORDER);
+            ::SetWindowSubclass(button, &ShortcutEditWindow::ChildSubclassProc,
+                                2, reinterpret_cast<DWORD_PTR>(this));
+        }
+        return button;
+    };
+
+    pick_file_button_ = make_button(kIdPickFile, Loc("resPickFile"), kFieldX,
+                                    278, 120, false);
+    pick_folder_button_ =
+        make_button(kIdPickFolder, Loc("resPickFolder"), kFieldX + 128, 278, 120,
+                    false);
+    test_button_ =
+        make_button(kIdTest, Loc("Common.BtnTest"), kFieldX + 256, 278, 90,
+                    false);
 
     hint_label_ = MakeControl(
-        WC_STATICW, Loc("resEditHint"),
-        WS_CHILD | WS_VISIBLE | SS_LEFT, kFieldX, 262, kFieldWidth, 36, 0);
+        WC_STATICW, Loc("resEditHint"), WS_CHILD | WS_VISIBLE | SS_LEFT,
+        kFieldX, 322, kFieldWidth, 58, 0);
 
-    ok_button_ = MakeControl(WC_BUTTONW, Loc("Common.BtnOK"),
-                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
-                             kWindowWidth - kMargin - 2 * 84 - 8, 306, 84,
-                             kButtonHeight, IDOK);
-    cancel_button_ = MakeControl(
-        WC_BUTTONW, Loc("Common.BtnCancel"),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        kWindowWidth - kMargin - 84, 306, 84, kButtonHeight, IDCANCEL);
+    ok_button_ = make_button(IDOK, Loc("Common.BtnOK"),
+                             kWindowWidth - kMargin - 2 * 96 - 8, 452, 96, true);
+    cancel_button_ = make_button(IDCANCEL, Loc("Common.BtnCancel"),
+                                 kWindowWidth - kMargin - 96, 452, 96, false);
 
     HWND subclassed[] = {keyword_edit_,      name_edit_,       command_line_edit_,
                          radio_none_,        radio_no_encoding_, radio_url_query_,
-                         radio_utf8_query_,  pick_file_button_, pick_folder_button_,
-                         test_button_,       ok_button_,       cancel_button_};
+                         radio_utf8_query_};
     for (HWND control : subclassed) {
         if (control != nullptr) {
-            ::SetWindowSubclass(control, &ShortcutEditWindow::ChildSubclassProc, 1,
+            ::SetWindowSubclass(control, &ShortcutEditWindow::ChildSubclassProc, 2,
                                 reinterpret_cast<DWORD_PTR>(this));
         }
     }
@@ -633,21 +655,13 @@ void ShortcutEditWindow::DrawHeader(HDC dc) const {
     }
     RECT client = {};
     ::GetClientRect(hwnd_, &client);
-
     wchar_t title[128] = {};
     ::GetWindowTextW(hwnd_, title, static_cast<int>(std::size(title)));
-
-    ::SetBkMode(dc, TRANSPARENT);
-    ::SetTextColor(dc, ::GetSysColor(COLOR_BTNTEXT));
-    HGDIOBJ previous = ::SelectObject(dc, title_font_);
-    RECT title_rect = {S(20), S(4), client.right - S(20), S(kHeaderHeight - 6)};
-    ::DrawTextW(dc, title, -1, &title_rect,
-                DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
-    ::SelectObject(dc, previous);
-
-    const RECT separator = {S(16), S(kHeaderHeight), client.right - S(16),
-                            S(kHeaderHeight) + 1};
-    ::FillRect(dc, &separator, ::GetSysColorBrush(COLOR_3DSHADOW));
+    fluent::FillBackground(dc, client);
+    fluent::DrawTitleBar(dc, hwnd_, title, title_font_, S(kHeaderHeight));
+    fluent::DrawCard(dc,
+                     RECT{S(kMargin), S(64), S(kWindowWidth - kMargin), S(504)},
+                     S(14));
 }
 
 void ShortcutEditWindow::OnPaint() {
@@ -666,10 +680,27 @@ void ShortcutEditWindow::PostButtonCommand(int id) const {
 
 LRESULT ShortcutEditWindow::HandleMessage(UINT message, WPARAM wparam,
                                           LPARAM lparam) {
+    const int title_height = S(kHeaderHeight);
+    if (message == WM_NCHITTEST || message == WM_MOUSEMOVE ||
+        message == WM_MOUSELEAVE || message == WM_LBUTTONUP) {
+        const LRESULT chrome =
+            fluent::HandleChromeMessage(hwnd_, message, wparam, lparam,
+                                        title_height);
+        if (chrome != -1) {
+            return chrome;
+        }
+    }
+
     switch (message) {
         case WM_COMMAND: {
             if (HIWORD(wparam) == BN_CLICKED) {
-                switch (LOWORD(wparam)) {
+                const int id = LOWORD(wparam);
+                if (id >= kIdParamNone && id <= kIdParamUtf8Query) {
+                    ::CheckRadioButton(hwnd_, kIdParamNone, kIdParamUtf8Query,
+                                       id);
+                    return 0;
+                }
+                switch (id) {
                     case IDOK:
                         Confirm();
                         return 0;
@@ -708,19 +739,20 @@ LRESULT ShortcutEditWindow::HandleMessage(UINT message, WPARAM wparam,
                 return 0;
             }
             break;
-        case WM_ERASEBKGND: {
-            HDC dc = reinterpret_cast<HDC>(wparam);
-            RECT client = {};
-            ::GetClientRect(hwnd_, &client);
-            if (background_brush_ != nullptr) {
-                ::FillRect(dc, &client, background_brush_);
-            }
+        case WM_ERASEBKGND:
             return 1;
-        }
         case WM_CTLCOLORSTATIC: {
             HDC dc = reinterpret_cast<HDC>(wparam);
             ::SetBkMode(dc, TRANSPARENT);
-            return reinterpret_cast<LRESULT>(background_brush_);
+            ::SetTextColor(dc, fluent::kTextSecondary);
+            return reinterpret_cast<LRESULT>(
+                ::GetStockObject(HOLLOW_BRUSH));
+        }
+        case WM_CTLCOLOREDIT: {
+            HDC dc = reinterpret_cast<HDC>(wparam);
+            ::SetBkColor(dc, fluent::kSurface);
+            ::SetTextColor(dc, fluent::kText);
+            return reinterpret_cast<LRESULT>(::GetStockObject(WHITE_BRUSH));
         }
         case WM_DESTROY:
             // Also covered by the destructor; kept for an explicit Destroy().

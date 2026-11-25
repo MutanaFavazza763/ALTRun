@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(ALTRun
-    VERSION 2.0.6
+    VERSION 2.1.0
     DESCRIPTION "ALTRun - an alternative Run. Fast launcher for Windows."
     LANGUAGES CXX RC)
 
@@ -36,6 +36,8 @@ set(ALTRUN_SOURCES
     src/ui/AboutWindow.cpp
     src/ui/ConfigWindow.cpp
     src/ui/D2DContext.cpp
+    src/ui/FluentTheme.cpp
+    src/ui/FluentMenu.cpp
     src/ui/MainWindow.cpp
     src/ui/ParamWindow.cpp
     src/ui/ShortcutEditWindow.cpp
@@ -68,6 +70,8 @@ set(ALTRUN_HEADERS
     src/ui/AboutWindow.h
     src/ui/ConfigWindow.h
     src/ui/D2DContext.h
+    src/ui/FluentTheme.h
+    src/ui/FluentMenu.h
     src/ui/MainWindow.h
     src/ui/ParamWindow.h
     src/ui/ShortcutEditWindow.h
@@ -100,8 +104,11 @@ target_link_libraries(ALTRun PRIVATE
     shcore
     comctl32
     imm32
+    gdiplus
+    msimg32
     shell32
     shlwapi
+    uxtheme
     user32
     gdi32
     ole32
@@ -166,3 +173,4 @@ if(ALTRUN_BUILD_TESTS)
     enable_testing()
     add_test(NAME altRunCore COMMAND altRunTests)
 endif()
+

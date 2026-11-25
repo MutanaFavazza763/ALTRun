@@ -22,13 +22,13 @@ constexpr float kOkWidth = 54.0f;
 constexpr UINT kTimerIdle = 3;
 constexpr size_t kMaxHistoryRows = 6;
 
-const D2D1_COLOR_F kBackground = D2D1::ColorF(0.102f, 0.110f, 0.125f, 1.0f);
-const D2D1_COLOR_F kBorder = D2D1::ColorF(0.239f, 0.255f, 0.290f, 1.0f);
-const D2D1_COLOR_F kEditBackground = D2D1::ColorF(0.059f, 0.067f, 0.078f, 1.0f);
-const D2D1_COLOR_F kSelected = D2D1::ColorF(0.161f, 0.290f, 0.435f, 1.0f);
-const D2D1_COLOR_F kTextBright = D2D1::ColorF(0.925f, 0.937f, 0.957f, 1.0f);
-const D2D1_COLOR_F kTextDim = D2D1::ColorF(0.541f, 0.569f, 0.612f, 1.0f);
-const D2D1_COLOR_F kAccent = D2D1::ColorF(0.361f, 0.659f, 0.988f, 1.0f);
+const D2D1_COLOR_F kBackground = D2D1::ColorF(0.976f, 0.988f, 1.0f, 1.0f);
+const D2D1_COLOR_F kBorder = D2D1::ColorF(0.839f, 0.878f, 0.925f, 1.0f);
+const D2D1_COLOR_F kEditBackground = D2D1::ColorF(1.0f, 1.0f, 1.0f, 1.0f);
+const D2D1_COLOR_F kSelected = D2D1::ColorF(0.800f, 0.894f, 1.0f, 1.0f);
+const D2D1_COLOR_F kTextBright = D2D1::ColorF(0.094f, 0.110f, 0.129f, 1.0f);
+const D2D1_COLOR_F kTextDim = D2D1::ColorF(0.357f, 0.388f, 0.431f, 1.0f);
+const D2D1_COLOR_F kAccent = D2D1::ColorF(0.000f, 0.471f, 0.839f, 1.0f);
 
 constexpr int kDefaultWidth = 460;
 
@@ -54,7 +54,7 @@ void ParamWindow::OnCreate() {
     row_format_.Attach(d2d_.CreateFormat(13.0f, DWRITE_FONT_WEIGHT_NORMAL));
     hint_format_.Attach(d2d_.CreateFormat(11.0f, DWRITE_FONT_WEIGHT_NORMAL));
 
-    edit_brush_ = ::CreateSolidBrush(RGB(15, 17, 20));
+    edit_brush_ = ::CreateSolidBrush(RGB(255, 255, 255));
 
     edit_ = ::CreateWindowExW(0, L"EDIT", L"",
                               WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_LEFT,
@@ -73,6 +73,8 @@ void ParamWindow::OnCreate() {
     d2d_.Initialize(hwnd_);
     const DWORD corner_pref = 2;
     ::DwmSetWindowAttribute(hwnd_, 33, &corner_pref, sizeof(corner_pref));
+    const BOOL dark = FALSE;
+    ::DwmSetWindowAttribute(hwnd_, 20, &dark, sizeof(dark));
 }
 
 void ParamWindow::Open(const Shortcut& item, ConfirmHandler on_confirm) {
@@ -278,10 +280,11 @@ void ParamWindow::DrawFrame() {
 
     // OK button.
     const D2D1_RECT_F ok = OkButtonRect();
-    d2d_.FillRoundedRect(ok, 4.0f, kSelected);
+    d2d_.FillRoundedRect(ok, 6.0f, kAccent);
     IDWriteTextFormat* centered = hint_format_.Get();
     centered->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-    d2d_.DrawTextBlock(Loc("Common.BtnOK"), centered, ok, kTextBright);
+    d2d_.DrawTextBlock(Loc("Common.BtnOK"), centered, ok,
+                       D2D1::ColorF(1.0f, 1.0f, 1.0f, 1.0f));
     centered->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 
     DrawHistory();
@@ -298,7 +301,11 @@ void ParamWindow::DrawHistory() {
     for (size_t row = 0; row < VisibleHistoryRows(); ++row) {
         const D2D1_RECT_F rect = HistoryRowRect(row);
         if (static_cast<int>(row) == selected_) {
-            d2d_.FillRoundedRect(rect, 4.0f, kSelected);
+            d2d_.FillRoundedRect(rect, 5.0f, kSelected);
+            d2d_.FillRoundedRect(
+                D2D1::RectF(rect.left + 1.0f, rect.top + 4.0f,
+                            rect.left + 4.0f, rect.bottom - 4.0f),
+                1.5f, kAccent);
         }
         const ParamHistoryItem& item = shown_[row];
         const std::wstring text = ToWide(item.text);
@@ -349,8 +356,8 @@ LRESULT ParamWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
     switch (message) {
         case WM_CTLCOLOREDIT: {
             HDC dc = reinterpret_cast<HDC>(wparam);
-            ::SetBkColor(dc, RGB(15, 17, 20));
-            ::SetTextColor(dc, RGB(236, 239, 244));
+            ::SetBkColor(dc, RGB(255, 255, 255));
+            ::SetTextColor(dc, RGB(24, 28, 33));
             return reinterpret_cast<LRESULT>(edit_brush_);
         }
         case WM_ACTIVATE:

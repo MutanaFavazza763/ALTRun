@@ -3,9 +3,13 @@
 > 一个 Windows 快速启动器：按 `Alt + R` 唤出，输入几个字母即可启动程序、打开文件/网址。
 >
 > 本仓库是 [etworker/ALTRun](https://github.com/etworker/ALTRun)（Delphi 2007，2016 年停更）
-> 的 **C++20 + 纯 Win32 + Direct2D** 重写版本，目标是功能 1:1 移植并修正原实现缺陷。
+> 的 **C++20 重写版本**：核心、托盘和启动器为纯 Win32 + Direct2D，
+> 设置与关于为独立 WinUI 3（C++/WinRT）程序。
 
 ![启动器截图](docs/images/launcher.png)
+
+> 启动器仍由主程序的原生 D2D 绘制；上图是 2.0.6 的布局截图，2.1 只调整了配色，
+> 未重新截取（原因见 `07-evidence/fluent-ui/README.md`）。
 
 参数输入窗（带全局参数历史）：
 
@@ -13,25 +17,25 @@
 
 M5 外观与系统集成：
 
-| 皮肤背景 | 多语言 | 关于窗口 |
+| 皮肤背景 | 多语言 | 关于（旧原生窗口） |
 |---|---|---|
 | ![皮肤背景](docs/images/launcher-skin.png) | ![多语言](docs/images/launcher-i18n.png) | ![关于](docs/images/about.png) |
 
-设置窗口（四个页签，热键按键捕获）：
+设置页已迁到独立的 **WinUI 3** 程序（`ALTRun.Settings.exe`，C++/WinRT），下面是真实运行截图：
 
-![设置-常规](docs/images/config-general.png)
+![设置-常规](docs/images/settings-winui-general.png)
 
-| 热键页 | 外观页 |
+| 热键页 | 外观页 | 版本与路径 |
+|---|---|---|
+| ![设置-热键](docs/images/settings-winui-hotkey.png) | ![设置-外观](docs/images/settings-winui-appearance.png) | ![设置-关于](docs/images/settings-winui-about.png) |
+
+首启向导与快捷项管理器仍由主程序的原生 Fluent 控件承载，语言下拉已改成自绘菜单：
+
+| 首启向导 | 语言菜单 |
 |---|---|
-| ![设置-热键](docs/images/config-hotkey.png) | ![设置-外观](docs/images/config-appearance.png) |
+| ![首启向导](docs/images/welcome-fluent.png) | ![语言菜单](docs/images/welcome-language-menu.png) |
 
-快捷项管理器与编辑对话框：
-
-![快捷项管理器](docs/images/manager.png)
-
-| 编辑对话框 |
-|---|
-| ![编辑快捷项](docs/images/shortcut-edit.png) |
+![快捷项管理器](docs/images/manager-fluent.png)
 
 ## 特性（已完成）
 
@@ -46,8 +50,9 @@ M5 外观与系统集成：
   Enter 确认 / Esc 两段式 / 空闲自动取消
 - 最近列表：`Ctrl+L` 查看、`ALT+L` 直接执行最近项（不增加 Freq）
 - `ExecuteIfOnlyOne`、输入末尾空格、`;`、`'` 等原版快捷执行方式
-- 设置窗口（`--config` 或托盘菜单）：常规 / 热键 / 外观 / 调试·关于 四页，
-  热键可直接按键捕获，确定后立即生效并写回 `ALTRun.ini`
+- 设置与关于（`--config`、`--about` 或托盘菜单）：独立 `ALTRun.Settings.exe`，WinUI 3 导航页
+  常规 / 热键 / 外观 / 版本与路径，热键按键捕获，保存后通过 `WM_APP+30` 通知主程序立即生效；
+  找不到设置程序或缺 Windows App Runtime 时回退旧的原生设置窗口
 - 快捷项管理器（托盘菜单或 `--manager`）：四列表格增删改、拖拽排序、拖放添加、
   `.lnk` 解析、相对/绝对路径转换、导入/导出，编辑后立即写回 `ShortCutList.txt`
 - **数据格式与旧版逐字节兼容**：`ShortCutList.txt`（GBK）、`FavoriteList.txt`、
@@ -71,20 +76,25 @@ M5 外观与系统集成：
 
 ## 构建
 
-需要 Visual Studio（MSVC + Windows SDK）和 CMake ≥ 3.28：
+需要 Visual Studio（MSVC + Windows SDK）、CMake ≥ 3.28，以及
+**Windows App Runtime 1.7+ / 2.x**（WinUI 3 设置程序运行所需，Windows 11 一般已预装）：
 
 ```powershell
-cmake -S . -B build/vs -G "Visual Studio 18 2026" -A x64
-cmake --build build/vs --config Release
+cmake -S . -B build -G "Visual Studio 18 2026" -A x64
+cmake --build build --config Release --target ALTRun
+& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" `
+  src/settings/ALTRun.Settings.vcxproj /p:Configuration=Release /p:Platform=x64
 ```
 
-或使用预设（Ninja）：`cmake --preset msvc-release`、`cmake --build --preset release`。
+主程序产物 `build/Release/ALTRun.exe`；WinUI 设置程序产物
+`build/settings/x64/Release/ALTRun.Settings.exe`。两者必须放在同一目录，
+设置程序才能读写同一份 `ALTRun.ini`，并通过窗口消息通知主程序重载。
 
-产物 `build/vs/Release/ALTRun.exe`；运行后在同目录生成 `ALTRun.ini`、
-`ShortCutList.txt`、`FavoriteList.txt`、`altRun.log`。
+运行后在同目录生成 `ALTRun.ini`、`ShortCutList.txt`、`FavoriteList.txt`、`altRun.log`。
 
-开发调试：`ALTRun.exe --show` 直接显示启动器窗口，`--config` 打开设置，
-`--manager` 打开快捷项管理器。
+开发调试：`ALTRun.exe --show` 直接显示启动器窗口，`--config` 打开 WinUI 设置，
+`--manager` 打开快捷项管理器，`--about` 打开版本与路径页。
+`ALTRun.Settings.exe --page general|hotkey|appearance|about` 可直达指定页。
 
 ## 文档
 
@@ -101,20 +111,20 @@ cmake --build build/vs --config Release
 ## 目录结构
 
 ```
-src/app    进程编排：单实例、热键、托盘、设置
-src/core   纯逻辑：编码、数据模型、存储、匹配、格式化、执行、日志
-src/ui     Win32 窗口 + Direct2D 绘制
-docs/      架构、路线图、逆向规格
-resources/ 运行时资源（皮肤、语言）
-src/       源码；应用图标 `ALTRun.ico` + `ALTRun.rc` 也在这里
+src/app      进程编排：单实例、热键、托盘、设置
+src/core     纯逻辑：编码、数据模型、存储、匹配、格式化、执行、日志
+src/ui       Win32 窗口 + Direct2D 绘制
+src/settings WinUI 3 设置程序（C++/WinRT + XAML）
+docs/        架构、路线图、逆向规格
+resources/   运行时资源（皮肤、语言）
+src/         源码；应用图标 `ALTRun.ico` + `ALTRun.rc` 也在这里
 ```
 
 ## 状态
 
-里程碑 M0（规格）、M1（可运行骨架）、M2（参数窗 / 参数历史 / 最近列表）、
-M3（设置界面）、M4（快捷项管理器）、M5（外观/多语言/系统集成）、M6（测试/打包）、
-M7–M11（托盘恢复、首启向导、默认列表现代化）均已完成；
-后续增强项见 [ROADMAP.md](docs/ROADMAP.md)。
+2.1.0：设置与关于迁到独立的 WinUI 3 程序；首启向导、快捷项管理器和编辑对话框
+统一为浅色 Fluent 视觉；主程序保留原生核心、托盘和启动器。
+里程碑 M0–M11 均已完成，后续增强项见 [ROADMAP.md](docs/ROADMAP.md)。
 
 ## 许可
 

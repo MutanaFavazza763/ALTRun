@@ -2,6 +2,7 @@
 
 #include <commctrl.h>
 #include <dwmapi.h>
+#include <windowsx.h>
 
 #include <algorithm>
 #include <iterator>
@@ -11,6 +12,7 @@
 
 #include "core/Logger.h"
 #include "core/Text.h"
+#include "ui/FluentTheme.h"
 #include "ui/UiText.h"
 
 namespace alt {
@@ -19,37 +21,54 @@ namespace {
 constexpr wchar_t kWindowClass[] = L"ALTRun.ConfigWindow.v2";
 // Version string shown on the 调试/关于 tab (single source of truth; the
 // original read about text from About.<Lang>, which the rewrite does not ship).
-constexpr wchar_t kVersion[] = L"ALTRun C++ rewrite (dev)";
+constexpr wchar_t kVersion[] = L"2.1.0";
 
 // Layout is written in 96-DPI design units and scaled with MulDiv in
 // ConfigWindow::S(); this keeps the dialog usable on >100% DPI monitors.
-constexpr int kWindowWidth = 720;
-constexpr int kWindowHeight = 540;
+constexpr int kWindowWidth = 960;
+constexpr int kWindowHeight = 640;
 constexpr int kMargin = 16;
-constexpr int kHeaderHeight = 44;
+constexpr int kHeaderHeight = 48;
 
-constexpr int kTabX = 16;
-constexpr int kTabY = 44;
-constexpr int kTabWidth = 688;
-constexpr int kTabHeight = 438;
+constexpr int kNavX = 16;
+constexpr int kNavY = 64;
+constexpr int kNavWidth = 184;
+constexpr int kNavItemHeight = 44;
+constexpr int kNavItemGap = 4;
 
-constexpr int kButtonWidth = 84;
-constexpr int kButtonHeight = 30;
-constexpr int kButtonY = 494;
+constexpr int kContentX = 216;
+constexpr int kContentWidth = 728;
+
+constexpr int kButtonWidth = 96;
+constexpr int kButtonHeight = 32;
+constexpr int kButtonY = 590;
 constexpr int kButtonGap = 8;
 
-// Top-left corner of the page content, in design units (the tab control's own
-// client area starts below the tab strip).
-constexpr int kPageLeft = kTabX + 12;
-constexpr int kPageTop = kTabY + 34;
+constexpr int kCardGeneralSearchTop = 64;
+constexpr int kCardGeneralSearchHeight = 300;
+constexpr int kCardGeneralStartupTop = 64;
+constexpr int kCardGeneralStartupHeight = 340;
+constexpr int kCardGeneralAdvancedTop = 412;
+constexpr int kCardGeneralAdvancedHeight = 158;
+constexpr int kCardHotkeyTop = 64;
+constexpr int kCardHotkeyHeight = 380;
+constexpr int kCardAppearanceTop = 64;
+constexpr int kCardAppearanceHeight = 300;
+constexpr int kCardDisplayTop = 248;
+constexpr int kCardDisplayHeight = 176;
+constexpr int kCardAboutTop = 64;
+constexpr int kCardAboutHeight = 476;
 
-constexpr int kRowHeight = 24;
-constexpr int kRowStep = 28;
+constexpr int kPageLeft = 232;
+constexpr int kPageTop = 96;
+
+constexpr int kRowHeight = 28;
+constexpr int kRowStep = 32;
 constexpr int kLabelGap = 8;
-constexpr int kHotkeyStep = 40;
+constexpr int kHotkeyStep = 48;
 
-constexpr int kCheckColumnWidth = 320;
-constexpr int kCheckColumnOffset = 340;
+constexpr int kCheckColumnWidth = 316;
+constexpr int kCheckColumnOffset = 352;
 
 // ---------------------------------------------------------------------------
 // Control <-> Settings field descriptors. The tab pages are built by walking
@@ -316,12 +335,12 @@ bool ConfigWindow::CreateConfigWindow(HINSTANCE instance) {
     controls.dwICC = ICC_TAB_CLASSES;
     ::InitCommonControlsEx(&controls);
 
-    // WS_CLIPCHILDREN keeps the native child controls from being painted over
-    // by the parent background erase; the popup/tool-window/topmost combination
-    // matches MainWindow and ParamWindow.
+    // Popup/tool-window/topmost matches MainWindow and ParamWindow.  The
+    // settings surface is fully custom-painted, so it deliberately does not
+    // use WS_CLIPCHILDREN: cards must be visible behind transparent labels.
     if (!Create(instance, kWindowClass,
                 L"ALTRun " + Loc("ConfigForm.ConfigFormCaption"),
-                WS_POPUP | WS_CLIPCHILDREN, WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) {
+                WS_POPUP, WS_EX_TOPMOST | WS_EX_TOOLWINDOW)) {
         return false;
     }
 
@@ -404,12 +423,16 @@ HWND ConfigWindow::AddLabel(int page, const std::wstring& text, int x, int y,
 
 HWND ConfigWindow::AddCheckBox(int page, const std::wstring& text, int x,
                                int y, int width) {
-    HWND box = MakeControl(page, WC_BUTTONW, text,
-                           WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, x, y, width,
-                           kRowHeight, 0);
+    HWND box = fluent::CreateToggle(hwnd_, instance_, 0, text, font_, width,
+                                    kRowHeight, dpi_);
     if (box != nullptr) {
-        ::SetWindowSubclass(box, &ConfigWindow::ChildSubclassProc, 1,
+        ::SetWindowPos(box, nullptr, S(x), S(y), 0, 0,
+                       SWP_NOSIZE | SWP_NOZORDER);
+        ::SetWindowSubclass(box, &ConfigWindow::ChildSubclassProc, 2,
                             reinterpret_cast<DWORD_PTR>(this));
+        if (page >= 0 && page < kPageCount) {
+            page_controls_[static_cast<size_t>(page)].push_back(box);
+        }
     }
     return box;
 }
@@ -419,14 +442,14 @@ HWND ConfigWindow::AddIntEdit(int page, const std::wstring& label,
                               int x, int y, int label_width, int edit_width) {
     AddLabel(page, label, x, y, label_width);
     HWND edit = MakeControl(page, WC_EDITW, L"",
-                            WS_CHILD | WS_TABSTOP | ES_LEFT | ES_NUMBER |
-                                ES_AUTOHSCROLL,
+                            WS_CHILD | WS_TABSTOP | WS_BORDER | ES_LEFT |
+                                ES_NUMBER | ES_AUTOHSCROLL,
                             x + label_width + kLabelGap, y, edit_width,
                             kRowHeight, 0);
     if (edit != nullptr) {
         ints_.push_back(IntBinding{edit, field, min_value, max_value});
         ::SendMessageW(edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN,
-                       MAKELPARAM(S(4), S(4)));
+                       MAKELPARAM(S(8), S(8)));
         ::SetWindowSubclass(edit, &ConfigWindow::ChildSubclassProc, 1,
                             reinterpret_cast<DWORD_PTR>(this));
     }
@@ -438,13 +461,14 @@ HWND ConfigWindow::AddTextEdit(int page, const std::wstring& label,
                                int label_width, int edit_width) {
     AddLabel(page, label, x, y, label_width);
     HWND edit = MakeControl(page, WC_EDITW, L"",
-                            WS_CHILD | WS_TABSTOP | ES_LEFT | ES_AUTOHSCROLL, x +
-                                label_width + kLabelGap,
+                            WS_CHILD | WS_TABSTOP | WS_BORDER | ES_LEFT |
+                                ES_AUTOHSCROLL,
+                            x + label_width + kLabelGap,
                             y, edit_width, kRowHeight, 0);
     if (edit != nullptr) {
         texts_.push_back(TextBinding{edit, field});
         ::SendMessageW(edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN,
-                       MAKELPARAM(S(4), S(4)));
+                       MAKELPARAM(S(8), S(8)));
         ::SetWindowSubclass(edit, &ConfigWindow::ChildSubclassProc, 1,
                             reinterpret_cast<DWORD_PTR>(this));
     }
@@ -459,8 +483,8 @@ HWND ConfigWindow::AddHotkeyEdit(int page, const std::wstring& label,
     // text with the normal edit caret/selection and Theme support, while the
     // HotkeySubclassProc consumes every key press.
     HWND edit = MakeControl(page, WC_EDITW, L"",
-                            WS_CHILD | WS_TABSTOP | ES_LEFT | ES_AUTOHSCROLL |
-                                ES_READONLY,
+                            WS_CHILD | WS_TABSTOP | WS_BORDER | ES_LEFT |
+                                ES_AUTOHSCROLL | ES_READONLY,
                             x + label_width + kLabelGap, y, edit_width,
                             kRowHeight, 0);
     if (edit != nullptr) {
@@ -468,7 +492,7 @@ HWND ConfigWindow::AddHotkeyEdit(int page, const std::wstring& label,
         ::SendMessageW(edit, EM_SETCUEBANNER, TRUE,
                        reinterpret_cast<LPARAM>(Loc("resHotkeyCue").c_str()));
         ::SendMessageW(edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN,
-                       MAKELPARAM(S(4), S(4)));
+                       MAKELPARAM(S(8), S(8)));
         ::SetWindowSubclass(edit, &ConfigWindow::HotkeySubclassProc, 1,
                             reinterpret_cast<DWORD_PTR>(this));
     }
@@ -484,16 +508,20 @@ void ConfigWindow::CreateControls() {
 
 void ConfigWindow::CreateGeneralPage() {
     const int check_count = static_cast<int>(std::size(kGeneralChecks));
-    constexpr int kChecksPerColumn = 7;
     for (int index = 0; index < check_count; ++index) {
-        const int column = index < kChecksPerColumn ? 0 : 1;
-        const int row = index < kChecksPerColumn ? index : index - kChecksPerColumn;
-        HWND box = AddCheckBox(kPageGeneral, Loc(kGeneralChecks[index].key),
-                               kPageLeft + column * kCheckColumnOffset,
-                               kPageTop + 8 + row * kRowStep,
-                               kCheckColumnWidth);
-        if (box != nullptr) {
-            bools_.push_back(BoolBinding{box, kGeneralChecks[index].field});
+        if (index < 5) {
+            HWND box = AddCheckBox(kPageGeneral, Loc(kGeneralChecks[index].key),
+                                   kPageLeft, 116 + index * 34, 300);
+            if (box != nullptr) {
+                bools_.push_back(BoolBinding{box, kGeneralChecks[index].field});
+            }
+        } else {
+            HWND box = AddCheckBox(kPageGeneral, Loc(kGeneralChecks[index].key),
+                                   kPageLeft + kCheckColumnOffset,
+                                   116 + (index - 5) * 32, 300);
+            if (box != nullptr) {
+                bools_.push_back(BoolBinding{box, kGeneralChecks[index].field});
+            }
         }
     }
 
@@ -502,55 +530,45 @@ void ConfigWindow::CreateGeneralPage() {
         AddIntEdit(kPageGeneral, Loc(kGeneralInts[index].key),
                    kGeneralInts[index].field, kGeneralInts[index].min_value,
                    kGeneralInts[index].max_value, kPageLeft,
-                   kPageTop + 216 + index * 32, 140, 80);
+                   440 + index * 38, 150, 84);
     }
 
-    AddLabel(kPageGeneral, Loc("resGeneralPageHint"), kPageLeft,
-             kPageTop + 296, 620);
+    AddLabel(kPageGeneral, Loc("resGeneralPageHint"), kPageLeft, 520, 680);
 }
 
 void ConfigWindow::CreateHotkeyPage() {
     // Hotkey capture writes directly into the text box only; Settings is
     // touched when 确定 is pressed (single write-back point, see class comment).
     AddHotkeyEdit(kPageHotkey, Loc("ConfigForm.LblHotKey1"), &Settings::hotkey1,
-                  kPageLeft, kPageTop + 8, 200, 380);
+                  kPageLeft, 118, 200, 380);
     AddHotkeyEdit(kPageHotkey, Loc("ConfigForm.LblHotKey2"), &Settings::hotkey2,
-                  kPageLeft, kPageTop + 8 + kHotkeyStep, 200, 380);
+                  kPageLeft, 118 + kHotkeyStep, 200, 380);
     AddHotkeyEdit(kPageHotkey, Loc("resLastItemHotKey"),
                   &Settings::last_item_hotkey, kPageLeft,
-                  kPageTop + 8 + 2 * kHotkeyStep, 200, 380);
+                  118 + 2 * kHotkeyStep, 200, 380);
 
-    AddLabel(kPageHotkey, Loc("resHotkeyHint1"), kPageLeft, kPageTop + 144,
-             640);
-    AddLabel(kPageHotkey, Loc("resHotkeyHint2"), kPageLeft, kPageTop + 168,
-             640);
-    AddLabel(kPageHotkey, Loc("resHotkeyHint3"), kPageLeft, kPageTop + 192,
-             640);
+    AddLabel(kPageHotkey, Loc("resHotkeyHint1"), kPageLeft, 292, 560);
+    AddLabel(kPageHotkey, Loc("resHotkeyHint2"), kPageLeft, 320, 560);
+    AddLabel(kPageHotkey, Loc("resHotkeyHint3"), kPageLeft, 348, 560);
 }
 
 void ConfigWindow::CreateAppearancePage() {
     AddIntEdit(kPageAppearance, Loc("ConfigForm.lblFormWidth"),
-               &Settings::form_width, 200, 800, kPageLeft, kPageTop + 8, 120,
-               80);
+               &Settings::form_width, 200, 800, kPageLeft, 116, 140, 84);
     AddIntEdit(kPageAppearance, Loc("ConfigForm.LblFormAlpha"), &Settings::alpha,
-               0, 255, kPageLeft, kPageTop + 44, 120, 80);
+               0, 255, kPageLeft, 152, 140, 84);
     AddIntEdit(kPageAppearance, Loc("ConfigForm.lblRoundBorderRadius"),
-               &Settings::round_border_radius, 0, 200, kPageLeft,
-               kPageTop + 80, 120, 80);
+               &Settings::round_border_radius, 0, 200, kPageLeft, 188, 140, 84);
     AddTextEdit(kPageAppearance, Loc("ConfigForm.LblLanguage"), &Settings::lang,
-                kPageLeft, kPageTop + 116, 120, 120);
-    AddLabel(kPageAppearance, L"zh_cn / zh_hk / en_us", kPageLeft + 360,
-             kPageTop + 64, 300);
+                kPageLeft, 224, 140, 150);
+    AddLabel(kPageAppearance, L"zh_cn / zh_hk / en_us", 380, 252, 172);
     AddTextEdit(kPageAppearance, Loc("ConfigForm.LblBackGroundImage"),
-                &Settings::bg_file_name, kPageLeft, kPageTop + 152, 120, 220);
+                &Settings::bg_file_name, kPageLeft, 288, 140, 172);
 
     const int check_count = static_cast<int>(std::size(kAppearanceChecks));
     for (int index = 0; index < check_count; ++index) {
-        const int column = index % 2;
-        const int row = index / 2;
         HWND box = AddCheckBox(kPageAppearance, Loc(kAppearanceChecks[index].key),
-                               kPageLeft + column * 170,
-                               kPageTop + 196 + row * kRowStep, 160);
+                               600, 294 + index * 32, 328);
         if (box != nullptr) {
             bools_.push_back(BoolBinding{box, kAppearanceChecks[index].field});
         }
@@ -558,12 +576,10 @@ void ConfigWindow::CreateAppearancePage() {
 
     // ListFormat: legacy editable drop-down with the three presets the
     // original dialog offered (docs/spec/02-config-options.md §3.5).
-    AddLabel(kPageAppearance, Loc("ConfigForm.LblListFormat"), kPageLeft + 360,
-             kPageTop + 8, 280);
     HWND combo = MakeControl(kPageAppearance, WC_COMBOBOXW, L"",
-                             WS_CHILD | WS_TABSTOP | CBS_DROPDOWN |
+                             WS_CHILD | WS_TABSTOP | WS_BORDER | CBS_DROPDOWN |
                                  CBS_AUTOHSCROLL | WS_VSCROLL,
-                             kPageLeft + 360, kPageTop + 32, 300, 260, 0);
+                             600, 112, 328, kRowHeight, 0);
     if (combo != nullptr) {
         const wchar_t* const kPresets[] = {L"%-25s| %s", L"%s (%s)",
                                            L"%s [%s]"};
@@ -571,22 +587,22 @@ void ConfigWindow::CreateAppearancePage() {
             ::SendMessageW(combo, CB_ADDSTRING, 0,
                            reinterpret_cast<LPARAM>(preset));
         }
+        ::SendMessageW(combo, CB_SETMINVISIBLE, 6, 0);
         texts_.push_back(TextBinding{combo, &Settings::list_format});
         // The combo forwards focus to its internal edit child; subclass it too
         // so Tab/Esc work while the user is typing the format string.
         HWND combo_edit = ::GetWindow(combo, GW_CHILD);
         if (combo_edit != nullptr) {
-            ::SetWindowSubclass(combo_edit, &ConfigWindow::ChildSubclassProc, 1,
+            ::SetWindowSubclass(combo_edit, &ConfigWindow::ChildSubclassProc, 2,
                                 reinterpret_cast<DWORD_PTR>(this));
         }
-        ::SetWindowSubclass(combo, &ConfigWindow::ChildSubclassProc, 1,
+        ::SetWindowSubclass(combo, &ConfigWindow::ChildSubclassProc, 2,
                             reinterpret_cast<DWORD_PTR>(this));
     }
 
-    AddLabel(kPageAppearance, Loc("resListFormatHint"), kPageLeft,
-             kPageTop + 296, 660);
-    AddLabel(kPageAppearance, Loc("resAppearanceHint"), kPageLeft,
-             kPageTop + 320, 660);
+    MakeControl(kPageAppearance, WC_STATICW, Loc("resListFormatHint"),
+                WS_CHILD | SS_LEFT, 600, 148, 328, 38, 0);
+    AddLabel(kPageAppearance, Loc("resAppearanceHint"), kPageLeft, 380, 600);
 }
 
 void ConfigWindow::CreateAboutPage() {
@@ -628,45 +644,26 @@ void ConfigWindow::OnCreate() {
     CreateFonts();
     background_brush_ = ::CreateSolidBrush(::GetSysColor(COLOR_BTNFACE));
 
-    // The tab control sits at the bottom of the z-order; every page control is
-    // a *sibling* above it (not a tab child) so switching pages only needs
-    // ShowWindow and there is no theming artifact when controls disappear.
-    // WS_CLIPSIBLINGS stops the tab from painting over those siblings.
-    tab_ = MakeControl(-1, WC_TABCONTROLW, L"",
-                       WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_TABSTOP,
-                       kTabX, kTabY, kTabWidth, kTabHeight, 0);
-    if (tab_ == nullptr) {
-        Logger::Instance().Error("config window: cannot create tab control");
-        return;
-    }
-    ::SetWindowSubclass(tab_, &ConfigWindow::ChildSubclassProc, 1,
-                        reinterpret_cast<DWORD_PTR>(this));
-
-    for (int index = 0; index < kPageCount; ++index) {
-        const std::wstring label = Loc(kTabKeys[index]);
-        TCITEMW item = {};
-        item.mask = TCIF_TEXT;
-        item.pszText = const_cast<LPWSTR>(label.c_str());
-        TabCtrl_InsertItem(tab_, index, &item);
-    }
-
     CreateControls();
 
     const int ok_x = kWindowWidth - kMargin - 2 * kButtonWidth - kButtonGap;
-    ok_button_ = MakeControl(-1, WC_BUTTONW, Loc("Common.BtnOK"),
-                             WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                             ok_x, kButtonY, kButtonWidth, kButtonHeight, IDOK);
-    cancel_button_ = MakeControl(
-        -1, WC_BUTTONW, Loc("Common.BtnCancel"),
-        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-        kWindowWidth - kMargin - kButtonWidth, kButtonY, kButtonWidth,
-        kButtonHeight, IDCANCEL);
+    ok_button_ = fluent::CreateButton(hwnd_, instance_, IDOK, Loc("Common.BtnOK"),
+                                      font_, kButtonWidth, kButtonHeight, dpi_,
+                                      true);
+    cancel_button_ = fluent::CreateButton(
+        hwnd_, instance_, IDCANCEL, Loc("Common.BtnCancel"), font_, kButtonWidth,
+        kButtonHeight, dpi_, false);
     if (ok_button_ != nullptr) {
-        ::SetWindowSubclass(ok_button_, &ConfigWindow::ChildSubclassProc, 1,
+        ::SetWindowPos(ok_button_, nullptr, S(ok_x), S(kButtonY), 0, 0,
+                       SWP_NOSIZE | SWP_NOZORDER);
+        ::SetWindowSubclass(ok_button_, &ConfigWindow::ChildSubclassProc, 2,
                             reinterpret_cast<DWORD_PTR>(this));
     }
     if (cancel_button_ != nullptr) {
-        ::SetWindowSubclass(cancel_button_, &ConfigWindow::ChildSubclassProc, 1,
+        ::SetWindowPos(cancel_button_, nullptr, S(kWindowWidth - kMargin -
+                                                  kButtonWidth),
+                       S(kButtonY), 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        ::SetWindowSubclass(cancel_button_, &ConfigWindow::ChildSubclassProc, 2,
                             reinterpret_cast<DWORD_PTR>(this));
     }
 
@@ -774,10 +771,6 @@ void ConfigWindow::SelectPage(int index) {
     if (index < 0 || index >= kPageCount) {
         index = kPageGeneral;
     }
-    if (tab_ != nullptr && TabCtrl_GetCurSel(tab_) != index) {
-        // TCM_SETCURSEL does not send TCN_SELCHANGE, so no recursion here.
-        TabCtrl_SetCurSel(tab_, index);
-    }
     current_page_ = index;
     for (int page = 0; page < kPageCount; ++page) {
         const bool show = page == index;
@@ -786,8 +779,8 @@ void ConfigWindow::SelectPage(int index) {
         }
     }
     if (hwnd_ != nullptr) {
-        // Repaint the whole client: hidden controls leave holes in the tab
-        // body and the native tab control does not repaint that area itself.
+        // Repaint the whole client: hidden controls leave holes in the card
+        // surface and the custom background has to be rebuilt.
         ::InvalidateRect(hwnd_, nullptr, TRUE);
     }
 }
@@ -881,22 +874,129 @@ void ConfigWindow::DrawHeader(HDC dc) const {
     if (font_ == nullptr || title_font_ == nullptr) {
         return;
     }
-    RECT client = {};
-    ::GetClientRect(hwnd_, &client);
+    fluent::DrawTitleBar(dc, hwnd_,
+                         L"ALTRun " + Loc("ConfigForm.ConfigFormCaption"),
+                         title_font_, S(kHeaderHeight));
+}
+
+RECT ConfigWindow::NavItemRect(int index) const {
+    const int top = 108 + index * (kNavItemHeight + kNavItemGap);
+    return RECT{S(kNavX), S(top), S(kNavX + kNavWidth),
+                S(top + kNavItemHeight)};
+}
+
+void ConfigWindow::DrawSection(HDC dc, const RECT& card,
+                               const std::wstring& title) const {
+    if (title.empty()) {
+        return;
+    }
+    ::SetBkMode(dc, TRANSPARENT);
+    ::SetTextColor(dc, fluent::kText);
+    HGDIOBJ old_font = ::SelectObject(
+        dc, title_font_ != nullptr ? title_font_ : font_);
+    RECT text = {card.left + S(16), card.top + S(12), card.right - S(16),
+                 card.top + S(42)};
+    ::DrawTextW(dc, title.c_str(), -1, &text,
+                DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS |
+                    DT_NOPREFIX);
+    ::SelectObject(dc, old_font);
+}
+
+void ConfigWindow::DrawPageChrome(HDC dc) const {
+    RECT nav_panel = {S(kNavX), S(kNavY), S(kNavX + kNavWidth),
+                      S(kNavY + 284)};
+    fluent::DrawCard(dc, nav_panel, S(12));
 
     ::SetBkMode(dc, TRANSPARENT);
-    ::SetTextColor(dc, ::GetSysColor(COLOR_BTNTEXT));
-    HGDIOBJ previous = ::SelectObject(dc, title_font_);
-    RECT title = {S(20), S(4), client.right - S(20), S(kHeaderHeight - 6)};
-    const std::wstring header =
-        L"ALTRun " + Loc("ConfigForm.ConfigFormCaption");
-    ::DrawTextW(dc, header.c_str(), -1, &title,
+    ::SetTextColor(dc, fluent::kAccent);
+    HGDIOBJ old_font = ::SelectObject(
+        dc, title_font_ != nullptr ? title_font_ : font_);
+    RECT brand = {S(32), S(76), S(184), S(102)};
+    ::DrawTextW(dc, L"ALTRun", -1, &brand,
                 DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
-    ::SelectObject(dc, previous);
+    ::SelectObject(dc, old_font);
 
-    const RECT separator = {S(16), S(kHeaderHeight), client.right - S(16),
-                            S(kHeaderHeight) + 1};
-    ::FillRect(dc, &separator, ::GetSysColorBrush(COLOR_3DSHADOW));
+    for (int index = 0; index < kPageCount; ++index) {
+        fluent::DrawNavItem(dc, NavItemRect(index), Loc(kTabKeys[index]), font_,
+                            index == current_page_, index == nav_hover_);
+    }
+
+    if (current_page_ == kPageGeneral) {
+        fluent::DrawCard(dc,
+                         RECT{S(kContentX), S(kCardGeneralSearchTop),
+                              S(kContentX + 352),
+                              S(kCardGeneralSearchTop + kCardGeneralSearchHeight)},
+                         S(12));
+        DrawSection(dc,
+                    RECT{S(kContentX), S(kCardGeneralSearchTop),
+                         S(kContentX + 352),
+                         S(kCardGeneralSearchTop + kCardGeneralSearchHeight)},
+                    Loc("resFluentSettingsSearch"));
+
+        fluent::DrawCard(dc,
+                         RECT{S(584), S(kCardGeneralStartupTop), S(944),
+                              S(kCardGeneralStartupTop + kCardGeneralStartupHeight)},
+                         S(12));
+        DrawSection(dc,
+                    RECT{S(584), S(kCardGeneralStartupTop), S(944),
+                         S(kCardGeneralStartupTop + kCardGeneralStartupHeight)},
+                    Loc("resFluentSettingsStartup"));
+
+        fluent::DrawCard(dc,
+                         RECT{S(kContentX), S(kCardGeneralAdvancedTop), S(944),
+                              S(kCardGeneralAdvancedTop + kCardGeneralAdvancedHeight)},
+                         S(12));
+        DrawSection(dc,
+                    RECT{S(kContentX), S(kCardGeneralAdvancedTop), S(944),
+                         S(kCardGeneralAdvancedTop + kCardGeneralAdvancedHeight)},
+                    Loc("resFluentSettingsAdvanced"));
+    } else if (current_page_ == kPageHotkey) {
+        fluent::DrawCard(dc,
+                         RECT{S(kContentX), S(kCardHotkeyTop), S(944),
+                              S(kCardHotkeyTop + kCardHotkeyHeight)},
+                         S(12));
+        DrawSection(dc,
+                    RECT{S(kContentX), S(kCardHotkeyTop), S(944),
+                         S(kCardHotkeyTop + kCardHotkeyHeight)},
+                    Loc("resFluentSettingsHotkeys"));
+    } else if (current_page_ == kPageAppearance) {
+        fluent::DrawCard(dc,
+                         RECT{S(kContentX), S(kCardAppearanceTop), S(568),
+                              S(kCardAppearanceTop + kCardAppearanceHeight)},
+                         S(12));
+        DrawSection(dc,
+                    RECT{S(kContentX), S(kCardAppearanceTop), S(568),
+                         S(kCardAppearanceTop + kCardAppearanceHeight)},
+                    Loc("resFluentSettingsAppearance"));
+
+        fluent::DrawCard(dc,
+                         RECT{S(584), S(64), S(944), S(228)}, S(12));
+        DrawSection(dc, RECT{S(584), S(64), S(944), S(228)},
+                    Loc("resFluentSettingsDisplay"));
+
+        fluent::DrawCard(dc,
+                         RECT{S(584), S(kCardDisplayTop), S(944),
+                              S(kCardDisplayTop + kCardDisplayHeight)},
+                         S(12));
+        DrawSection(dc,
+                    RECT{S(584), S(kCardDisplayTop), S(944),
+                         S(kCardDisplayTop + kCardDisplayHeight)},
+                    Loc("resFluentSettingsOptions"));
+    } else if (current_page_ == kPageAbout) {
+        fluent::DrawCard(dc,
+                         RECT{S(kContentX), S(kCardAboutTop), S(944),
+                              S(kCardAboutTop + kCardAboutHeight)},
+                         S(12));
+        DrawSection(dc,
+                    RECT{S(kContentX), S(kCardAboutTop), S(944),
+                         S(kCardAboutTop + kCardAboutHeight)},
+                    Loc("resFluentSettingsAbout"));
+    }
+
+    // Footer surface for the two command buttons.
+    RECT footer = {S(kContentX), S(576), S(944), S(628)};
+    fluent::FillRounded(dc, footer, S(10), fluent::kSurface);
+    fluent::StrokeRounded(dc, footer, S(10), fluent::kBorder);
 }
 
 // ---------------------------------------------------------------------------
@@ -911,6 +1011,17 @@ void ConfigWindow::PostButtonCommand(int id) const {
 }
 
 LRESULT ConfigWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
+    const int title_height = S(kHeaderHeight);
+    if (message == WM_NCHITTEST || message == WM_MOUSEMOVE ||
+        message == WM_MOUSELEAVE || message == WM_LBUTTONUP) {
+        const LRESULT chrome =
+            fluent::HandleChromeMessage(hwnd_, message, wparam, lparam,
+                                        title_height);
+        if (chrome != -1) {
+            return chrome;
+        }
+    }
+
     switch (message) {
         case WM_COMMAND: {
             if (HIWORD(wparam) == BN_CLICKED) {
@@ -928,15 +1039,42 @@ LRESULT ConfigWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
             // values are only harvested when 确定 is pressed.
             return 0;
         }
-        case WM_NOTIFY: {
-            const NMHDR* header = reinterpret_cast<const NMHDR*>(lparam);
-            if (header != nullptr && header->hwndFrom == tab_ &&
-                header->code == TCN_SELCHANGE) {
-                SelectPage(TabCtrl_GetCurSel(tab_));
-                return 0;
+        case WM_LBUTTONDOWN: {
+            POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+            for (int index = 0; index < kPageCount; ++index) {
+                RECT item = NavItemRect(index);
+                if (PtInRect(&item, point)) {
+                    SelectPage(index);
+                    return 0;
+                }
             }
             break;
         }
+        case WM_MOUSEMOVE: {
+            POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+            int hover = -1;
+            for (int index = 0; index < kPageCount; ++index) {
+                RECT item = NavItemRect(index);
+                if (PtInRect(&item, point)) {
+                    hover = index;
+                    break;
+                }
+            }
+            if (hover != nav_hover_) {
+                nav_hover_ = hover;
+                ::InvalidateRect(hwnd_, nullptr, FALSE);
+            }
+            TRACKMOUSEEVENT track = {sizeof(TRACKMOUSEEVENT), TME_LEAVE, hwnd_,
+                                     0};
+            ::TrackMouseEvent(&track);
+            break;
+        }
+        case WM_MOUSELEAVE:
+            if (nav_hover_ != -1) {
+                nav_hover_ = -1;
+                ::InvalidateRect(hwnd_, nullptr, FALSE);
+            }
+            break;
         case WM_CLOSE:
             // "Closing" the dialog means cancel, not DestroyWindow: the window
             // is created once and reused by App.
@@ -956,28 +1094,40 @@ LRESULT ConfigWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
                 return 0;
             }
             break;
-        case WM_ERASEBKGND: {
-            HDC dc = reinterpret_cast<HDC>(wparam);
-            RECT client = {};
-            ::GetClientRect(hwnd_, &client);
-            if (background_brush_ != nullptr) {
-                ::FillRect(dc, &client, background_brush_);
-            }
+        case WM_ERASEBKGND:
             return 1;
-        }
         case WM_PAINT: {
             PAINTSTRUCT paint = {};
             HDC dc = ::BeginPaint(hwnd_, &paint);
+            RECT client = {};
+            ::GetClientRect(hwnd_, &client);
+            fluent::FillBackground(dc, client);
             DrawHeader(dc);
+            DrawPageChrome(dc);
             ::EndPaint(hwnd_, &paint);
             return 0;
         }
         case WM_CTLCOLORSTATIC: {
-            // Static labels and the read-only hotkey boxes share the dialog
-            // background instead of the default white.
             HDC dc = reinterpret_cast<HDC>(wparam);
+            HWND control = reinterpret_cast<HWND>(lparam);
+            const DWORD style =
+                static_cast<DWORD>(::GetWindowLongPtrW(control, GWL_STYLE));
+            if ((style & ES_READONLY) != 0) {
+                ::SetBkColor(dc, fluent::kSurface);
+                ::SetTextColor(dc, fluent::kText);
+                return reinterpret_cast<LRESULT>(::GetStockObject(WHITE_BRUSH));
+            }
             ::SetBkMode(dc, TRANSPARENT);
-            return reinterpret_cast<LRESULT>(background_brush_);
+            ::SetTextColor(dc, fluent::kText);
+            return reinterpret_cast<LRESULT>(
+                ::GetStockObject(HOLLOW_BRUSH));
+        }
+        case WM_CTLCOLOREDIT:
+        case WM_CTLCOLORLISTBOX: {
+            HDC dc = reinterpret_cast<HDC>(wparam);
+            ::SetBkColor(dc, fluent::kSurface);
+            ::SetTextColor(dc, fluent::kText);
+            return reinterpret_cast<LRESULT>(::GetStockObject(WHITE_BRUSH));
         }
         case WM_DESTROY:
             // Also covered by the destructor; handled here for an explicit
@@ -1096,3 +1246,4 @@ LRESULT CALLBACK ConfigWindow::HotkeySubclassProc(HWND hwnd, UINT message,
 }
 
 }  // namespace alt
+

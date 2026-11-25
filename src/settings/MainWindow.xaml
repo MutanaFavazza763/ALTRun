@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window x:Class="ALTRunSettings.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:ALTRunSettings">
+  <Grid x:Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid.Resources>
+      <Style x:Key="CardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="20" />
+      </Style>
+      <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+      </Style>
+      <Style x:Key="HintStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+      </Style>
+      <Style x:Key="ToggleStyle" TargetType="ToggleSwitch">
+        <Setter Property="OnContent" Value="" />
+        <Setter Property="OffContent" Value="" />
+        <Setter Property="Margin" Value="0,2" />
+      </Style>
+      <Style x:Key="FieldStyle" TargetType="NumberBox">
+        <Setter Property="SpinButtonPlacementMode" Value="Compact" />
+        <Setter Property="MinWidth" Value="160" />
+      </Style>
+    </Grid.Resources>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="48" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="72" />
+    </Grid.RowDefinitions>
+    <Grid x:Name="AppTitleBar" Grid.Row="0" Background="Transparent" Padding="16,0,140,0">
+      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <FontIcon Glyph="&#xE734;" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+        <TextBlock Text="ALTRun" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <TextBlock x:Name="TitleBarSubtitle" Text="Settings" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+      </StackPanel>
+    </Grid>
+    <NavigationView x:Name="Nav" Grid.Row="1" PaneDisplayMode="Left" IsSettingsVisible="False"
+        IsBackButtonVisible="Collapsed" AlwaysShowHeader="False" SelectionChanged="OnNavigationSelectionChanged">
+      <NavigationView.MenuItems>
+        <NavigationViewItem x:Name="NavGeneral" Tag="general" Content="常规">
+          <NavigationViewItem.Icon><FontIcon Glyph="&#xE80F;" /></NavigationViewItem.Icon>
+        </NavigationViewItem>
+        <NavigationViewItem x:Name="NavHotkey" Tag="hotkey" Content="热键">
+          <NavigationViewItem.Icon><FontIcon Glyph="&#xE765;" /></NavigationViewItem.Icon>
+        </NavigationViewItem>
+        <NavigationViewItem x:Name="NavAppearance" Tag="appearance" Content="外观">
+          <NavigationViewItem.Icon><FontIcon Glyph="&#xE790;" /></NavigationViewItem.Icon>
+        </NavigationViewItem>
+        <NavigationViewItem x:Name="NavAbout" Tag="about" Content="关于">
+          <NavigationViewItem.Icon><FontIcon Glyph="&#xE897;" /></NavigationViewItem.Icon>
+        </NavigationViewItem>
+      </NavigationView.MenuItems>
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <StackPanel Margin="28,20,28,8" Spacing="4">
+          <TextBlock x:Name="PageTitle" Text="常规" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock x:Name="PageSubtitle" Text="" Style="{StaticResource HintStyle}" />
+        </StackPanel>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <Grid Margin="28,8,28,24">
+            <StackPanel x:Name="GeneralPage" Spacing="16">
+              <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                  <TextBlock x:Name="GeneralSearchTitle" Style="{StaticResource SectionTitleStyle}" />
+                  <TextBlock x:Name="GeneralSearchHint" Style="{StaticResource HintStyle}" />
+                  <Grid ColumnSpacing="24">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                      <ToggleSwitch x:Name="GeneralRegex" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="GeneralMatchAnywhere" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="GeneralNumberKey" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="GeneralIndexFrom0" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="GeneralRememberFavourite" Style="{StaticResource ToggleStyle}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="2">
+                      <ToggleSwitch x:Name="GeneralShowTopTen" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="GeneralExecuteIfOnlyOne" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="GeneralExitWhenExecute" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="GeneralShowCommandLine" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="GeneralShowOperationHint" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="GeneralAutoRun" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="GeneralAddToSendTo" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="GeneralShowMeWhenStart" Style="{StaticResource ToggleStyle}" />
+                    </StackPanel>
+                  </Grid>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                  <TextBlock x:Name="GeneralAdvancedTitle" Style="{StaticResource SectionTitleStyle}" />
+                  <Grid ColumnSpacing="24">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="4">
+                      <NumberBox x:Name="GeneralHideDelay" Style="{StaticResource FieldStyle}" />
+                      <TextBlock x:Name="GeneralHideDelayHint" Style="{StaticResource HintStyle}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4">
+                      <NumberBox x:Name="GeneralParamHistoryLimit" Style="{StaticResource FieldStyle}" />
+                      <TextBlock x:Name="GeneralParamHistoryHint" Style="{StaticResource HintStyle}" />
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock x:Name="GeneralHint" Style="{StaticResource HintStyle}" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
+            <StackPanel x:Name="HotkeyPage" Spacing="16" Visibility="Collapsed">
+              <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="16">
+                  <TextBlock x:Name="HotkeyCardTitle" Style="{StaticResource SectionTitleStyle}" />
+                  <TextBox x:Name="Hotkey1Box" IsReadOnly="True" KeyDown="OnHotkeyKeyDown" />
+                  <TextBox x:Name="Hotkey2Box" IsReadOnly="True" KeyDown="OnHotkeyKeyDown" />
+                  <TextBox x:Name="LastItemHotkeyBox" IsReadOnly="True" KeyDown="OnHotkeyKeyDown" />
+                  <TextBlock x:Name="HotkeyHint1" Style="{StaticResource HintStyle}" />
+                  <TextBlock x:Name="HotkeyHint2" Style="{StaticResource HintStyle}" />
+                  <TextBlock x:Name="HotkeyHint3" Style="{StaticResource HintStyle}" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
+            <StackPanel x:Name="AppearancePage" Spacing="16" Visibility="Collapsed">
+              <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                  <StackPanel Spacing="12">
+                    <TextBlock x:Name="AppearanceCardTitle" Style="{StaticResource SectionTitleStyle}" />
+                    <NumberBox x:Name="FormWidthBox" Style="{StaticResource FieldStyle}" />
+                    <NumberBox x:Name="AlphaBox" Style="{StaticResource FieldStyle}" />
+                    <NumberBox x:Name="RadiusBox" Style="{StaticResource FieldStyle}" />
+                    <ComboBox x:Name="LanguageCombo">
+                      <ComboBoxItem Tag="zh_cn" Content="简体中文" />
+                      <ComboBoxItem Tag="zh_hk" Content="繁體中文" />
+                      <ComboBoxItem Tag="en_us" Content="English" />
+                    </ComboBox>
+                    <TextBox x:Name="BackgroundBox" />
+                  </StackPanel>
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="16">
+                  <Border Style="{StaticResource CardStyle}">
+                    <StackPanel Spacing="12">
+                      <TextBlock x:Name="DisplayCardTitle" Style="{StaticResource SectionTitleStyle}" />
+                      <TextBox x:Name="ListFormatBox" />
+                      <TextBlock x:Name="ListFormatHint" Style="{StaticResource HintStyle}" />
+                    </StackPanel>
+                  </Border>
+                  <Border Style="{StaticResource CardStyle}">
+                    <StackPanel Spacing="8">
+                      <TextBlock x:Name="OptionsCardTitle" Style="{StaticResource SectionTitleStyle}" />
+                      <ToggleSwitch x:Name="ShowSkinToggle" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="ShowTrayIconToggle" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="PlayPopupNotifyToggle" Style="{StaticResource ToggleStyle}" />
+                      <ToggleSwitch x:Name="ShowStartNotificationToggle" Style="{StaticResource ToggleStyle}" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </Grid>
+              <TextBlock x:Name="AppearanceHint" Style="{StaticResource HintStyle}" />
+            </StackPanel>
+
+            <StackPanel x:Name="AboutPage" Spacing="16" Visibility="Collapsed">
+              <Border Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                  <TextBlock x:Name="AboutCardTitle" Style="{StaticResource SectionTitleStyle}" />
+                  <TextBlock x:Name="AboutVersion" FontSize="20" FontWeight="SemiBold" />
+                  <TextBlock x:Name="AboutIniPath" IsTextSelectionEnabled="True" TextWrapping="Wrap" />
+                  <TextBlock x:Name="AboutRunCount" />
+                  <ToggleSwitch x:Name="AboutTrace" Style="{StaticResource ToggleStyle}" />
+                  <TextBlock x:Name="AboutRelatedFilesTitle" Style="{StaticResource SectionTitleStyle}" Margin="0,8,0,0" />
+                  <TextBlock x:Name="AboutParamHistory" IsTextSelectionEnabled="True" TextWrapping="Wrap" />
+                  <TextBlock x:Name="AboutShortcutList" IsTextSelectionEnabled="True" TextWrapping="Wrap" />
+                  <TextBlock x:Name="AboutFavouriteList" IsTextSelectionEnabled="True" TextWrapping="Wrap" />
+                  <TextBlock x:Name="AboutHint" Style="{StaticResource HintStyle}" Margin="0,8,0,0" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </Grid>
+        </ScrollViewer>
+      </Grid>
+    </NavigationView>
+    <Border Grid.Row="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+      <Grid Padding="28,0">
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" VerticalAlignment="Center">
+          <Button x:Name="CancelButton" Content="取消" Click="OnCancelClick" MinWidth="88" />
+          <Button x:Name="SaveButton" Content="保存" Click="OnSaveClick" Style="{StaticResource AccentButtonStyle}" MinWidth="88" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

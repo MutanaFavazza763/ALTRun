@@ -1,3 +1,36 @@
+#include <windows.h>
+#pragma code_page(65001)
 #include "resource_ids.h"
 
 IDI_ALTRUN ICON "ALTRun.ico"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 2,1,0,0
+ PRODUCTVERSION 2,1,0,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404b0"
+        BEGIN
+            VALUE "CompanyName", "ALTRun\0"
+            VALUE "FileDescription", "ALTRun 快捷启动器\0"
+            VALUE "FileVersion", "2.1.0.0\0"
+            VALUE "InternalName", "ALTRun\0"
+            VALUE "LegalCopyright", "ALTRun contributors\0"
+            VALUE "OriginalFilename", "ALTRun.exe\0"
+            VALUE "ProductName", "ALTRun\0"
+            VALUE "ProductVersion", "2.1.0.0\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 1200
+    END
+END
+
+
