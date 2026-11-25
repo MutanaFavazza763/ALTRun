@@ -31,17 +31,17 @@ constexpr int kContentWidth = kWindowWidth - 2 * kMargin;
 constexpr int kCardTop = 72;
 constexpr int kCardBottom = 496;
 constexpr int kIntroY = 92;
-constexpr int kGuideY = 130;
-constexpr int kGuideHeight = 84;
-constexpr int kLanguageLabelY = 226;
-constexpr int kLanguageComboY = 254;
-constexpr int kAutoRunY = 296;
-constexpr int kSendToY = 332;
-constexpr int kNoteY = 368;
+constexpr int kGuideY = 136;
+constexpr int kGuideLineHeight = 22;
+constexpr int kLanguageLabelY = 228;
+constexpr int kLanguageComboY = 260;
+constexpr int kAutoRunY = 304;
+constexpr int kSendToY = 340;
+constexpr int kNoteY = 376;
 constexpr int kNoteHeight = 42;
-constexpr int kButtonWidth = 160;
+constexpr int kButtonWidth = 184;
 constexpr int kButtonHeight = 36;
-constexpr int kButtonY = 420;
+constexpr int kButtonY = 428;
 
 constexpr int kIdStart = IDOK;
 constexpr int kIdLanguage = 3001;
@@ -104,10 +104,27 @@ void WelcomeWindow::CreateFonts() {
         title_log.lfHeight = -::MulDiv(36, dpi_, USER_DEFAULT_SCREEN_DPI);
         title_log.lfWeight = FW_NORMAL;
         icon_font_ = ::CreateFontIndirectW(&title_log);
+
+        LOGFONTW lead_log = {};
+        ::GetObjectW(font_, static_cast<int>(sizeof(lead_log)), &lead_log);
+        lead_log.lfWeight = FW_SEMIBOLD;
+        lead_font_ = ::CreateFontIndirectW(&lead_log);
+
+        LOGFONTW kbd_log = lead_log;
+        kbd_log.lfHeight = -::MulDiv(20, dpi_, 144);
+        kbd_font_ = ::CreateFontIndirectW(&kbd_log);
     }
 }
 
 void WelcomeWindow::DestroyResources() {
+    if (kbd_font_ != nullptr) {
+        ::DeleteObject(kbd_font_);
+        kbd_font_ = nullptr;
+    }
+    if (lead_font_ != nullptr) {
+        ::DeleteObject(lead_font_);
+        lead_font_ = nullptr;
+    }
     if (icon_font_ != nullptr) {
         ::DeleteObject(icon_font_);
         icon_font_ = nullptr;
@@ -150,16 +167,18 @@ HWND WelcomeWindow::MakeControl(const wchar_t* class_name, const wchar_t* text,
 }
 
 void WelcomeWindow::CreateControls() {
-    intro_text_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
+    intro_text_ = MakeControl(WC_STATICW, L"",
+                              WS_CHILD | WS_VISIBLE | SS_LEFT | SS_CENTERIMAGE,
                               kMargin + 72, kIntroY, kContentWidth - 96, 30, 0);
-    guide_text_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
-                              kMargin + 24, kGuideY, kContentWidth - 48,
-                              kGuideHeight, 0);
+    if (intro_text_ != nullptr && lead_font_ != nullptr) {
+        ::SendMessageW(intro_text_, WM_SETFONT,
+                       reinterpret_cast<WPARAM>(lead_font_), TRUE);
+    }
 
     language_label_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
                                    kMargin + 24, kLanguageLabelY, 160, 24, 0);
     language_button_ = fluent::CreateButton(
-        hwnd_, instance_, kIdLanguage, L"", font_, 200, 34, dpi_, false, true);
+        hwnd_, instance_, kIdLanguage, L"", font_, 200, 36, dpi_, false, true);
     if (language_button_ != nullptr) {
         ::SetWindowPos(language_button_, nullptr, S(kMargin + 24),
                        S(kLanguageComboY), 0, 0, SWP_NOSIZE | SWP_NOZORDER);
@@ -208,9 +227,7 @@ void WelcomeWindow::RefreshTexts() {
     if (hotkey.empty()) {
         hotkey = L"Alt + R";
     }
-    ::SetWindowTextW(
-        guide_text_,
-        ReplaceToken(text.Get("resWelcomeGuide"), hotkey).c_str());
+    guide_text_ = ReplaceToken(text.Get("resWelcomeGuide"), hotkey);
     ::SetWindowTextW(language_label_,
                      text.Get("resWelcomeLanguage").c_str());
     ::SetWindowTextW(auto_run_check_,
@@ -228,6 +245,9 @@ void WelcomeWindow::RefreshTexts() {
     if (send_to_check_ != nullptr) {
         ::InvalidateRect(send_to_check_, nullptr, TRUE);
     }
+    // The usage guide is painted by the parent (it mixes normal text with
+    // keyboard-key pills), so force a repaint when the locale or hotkey changes.
+    ::InvalidateRect(hwnd_, nullptr, TRUE);
 
     int index = 2;  // en_us
     if (settings_.lang == "zh_cn") {
@@ -304,10 +324,11 @@ void WelcomeWindow::DrawHeader(HDC dc) const {
                  S(kCardBottom)};
     fluent::DrawCard(dc, card, S(14));
 
-    // A small accent tile makes the first-run page feel like a welcome card
-    // rather than a plain form.
-    RECT tile = {S(kMargin + 24), S(kCardTop + 24), S(kMargin + 64),
-                 S(kCardTop + 64)};
+    // Center the 40px tile on the 30px lead-text line so the star and the
+    // headline share the same optical centre (kIntroY is the text top, the
+    // line is 30px tall, so the tile starts 5px above it).
+    RECT tile = {S(kMargin + 24), S(kIntroY - 5), S(kMargin + 64),
+                 S(kIntroY + 35)};
     fluent::FillRounded(dc, tile, S(12), fluent::kAccentSoft);
     ::SetBkMode(dc, TRANSPARENT);
     ::SetTextColor(dc, fluent::kAccent);
@@ -317,6 +338,101 @@ void WelcomeWindow::DrawHeader(HDC dc) const {
     ::DrawTextW(dc, L"\u2726", -1, &glyph,
                 DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
     ::SelectObject(dc, old);
+
+    DrawGuide(dc);
+}
+
+void WelcomeWindow::DrawGuide(HDC dc) const {
+    if (guide_text_.empty() || font_ == nullptr) {
+        return;
+    }
+    ::SetBkMode(dc, TRANSPARENT);
+    ::SetTextColor(dc, fluent::kText);
+    HGDIOBJ old_font = ::SelectObject(dc, font_);
+    const int left = S(kMargin + 24);
+    const int top = S(kGuideY);
+    const int line_height = S(kGuideLineHeight);
+    size_t start = 0;
+    int line_index = 0;
+    while (start <= guide_text_.size()) {
+        size_t end = guide_text_.find(L'\n', start);
+        if (end == std::wstring::npos) {
+            end = guide_text_.size();
+        }
+        std::wstring line = guide_text_.substr(start, end - start);
+        if (!line.empty() && line.back() == L'\r') {
+            line.pop_back();
+        }
+        DrawGuideLine(dc, line, left, top + line_index * line_height);
+        ++line_index;
+        if (end == guide_text_.size()) {
+            break;
+        }
+        start = end + 1;
+    }
+    ::SelectObject(dc, old_font);
+}
+
+void WelcomeWindow::DrawGuideLine(HDC dc, const std::wstring& line, int x,
+                                  int y) const {
+    const int line_height = S(kGuideLineHeight);
+    size_t position = 0;
+    while (position < line.size()) {
+        const size_t open = line.find(L"[[", position);
+        const size_t normal_end =
+            open == std::wstring::npos ? line.size() : open;
+        if (normal_end > position) {
+            const std::wstring normal = line.substr(position, normal_end - position);
+            SIZE size = {};
+            ::GetTextExtentPoint32W(dc, normal.c_str(),
+                                    static_cast<int>(normal.size()), &size);
+            ::TextOutW(dc, x, y + (line_height - size.cy) / 2, normal.c_str(),
+                       static_cast<int>(normal.size()));
+            x += size.cx;
+        }
+        if (open == std::wstring::npos) {
+            break;
+        }
+        const size_t close = line.find(L"]]", open + 2);
+        if (close == std::wstring::npos) {
+            // Unclosed marker: draw the rest as normal text.
+            const std::wstring remainder = line.substr(open);
+            SIZE size = {};
+            ::GetTextExtentPoint32W(dc, remainder.c_str(),
+                                    static_cast<int>(remainder.size()), &size);
+            ::TextOutW(dc, x, y + (line_height - size.cy) / 2,
+                       remainder.c_str(), static_cast<int>(remainder.size()));
+            break;
+        }
+        const std::wstring key = line.substr(open + 2, close - open - 2);
+        if (!key.empty() && kbd_font_ != nullptr) {
+            HGDIOBJ old_key_font = ::SelectObject(dc, kbd_font_);
+            SIZE key_size = {};
+            ::GetTextExtentPoint32W(dc, key.c_str(),
+                                    static_cast<int>(key.size()), &key_size);
+            const int padding_x = S(7);
+            const int pill_height = S(20);
+            const int pill_top = y + (line_height - pill_height) / 2;
+            const int pill_width = key_size.cx + padding_x * 2;
+            RECT pill = {x, pill_top, x + pill_width, pill_top + pill_height};
+            fluent::FillRounded(dc, pill, S(5), RGB(241, 244, 248));
+            fluent::StrokeRounded(dc, pill, S(5), RGB(214, 220, 229));
+            ::SetTextColor(dc, fluent::kText);
+            ::TextOutW(dc, x + padding_x,
+                       pill_top + (pill_height - key_size.cy) / 2, key.c_str(),
+                       static_cast<int>(key.size()));
+            ::SelectObject(dc, old_key_font);
+            x += pill_width + S(3);
+        } else if (!key.empty()) {
+            SIZE size = {};
+            ::GetTextExtentPoint32W(dc, key.c_str(),
+                                    static_cast<int>(key.size()), &size);
+            ::TextOutW(dc, x, y + (line_height - size.cy) / 2, key.c_str(),
+                       static_cast<int>(key.size()));
+            x += size.cx;
+        }
+        position = close + 2;
+    }
 }
 
 void WelcomeWindow::UpdateLanguageButton() {
@@ -417,8 +533,10 @@ LRESULT WelcomeWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam)
         }
         case WM_CTLCOLORSTATIC: {
             HDC dc = reinterpret_cast<HDC>(wparam);
+            HWND control = reinterpret_cast<HWND>(lparam);
             ::SetBkMode(dc, TRANSPARENT);
-            ::SetTextColor(dc, fluent::kText);
+            ::SetTextColor(dc, control == intro_text_ ? fluent::kAccent
+                                                      : fluent::kText);
             return reinterpret_cast<LRESULT>(
                 ::GetStockObject(HOLLOW_BRUSH));
         }

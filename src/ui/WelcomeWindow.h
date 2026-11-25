@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <functional>
+#include <string>
 
 #include "app/Settings.h"
 #include "ui/Window.h"
@@ -48,6 +49,8 @@ private:
     void UpdateLanguageButton();
     void PlaceOnCursorMonitor();
     void DrawHeader(HDC dc) const;
+    void DrawGuide(HDC dc) const;
+    void DrawGuideLine(HDC dc, const std::wstring& line, int x, int y) const;
     void Accept();
 
     static LRESULT CALLBACK ChildSubclassProc(HWND hwnd, UINT message,
@@ -61,11 +64,13 @@ private:
     HFONT font_ = nullptr;
     HFONT title_font_ = nullptr;
     HFONT icon_font_ = nullptr;
+    HFONT lead_font_ = nullptr;
+    HFONT kbd_font_ = nullptr;
     bool font_is_stock_ = false;
     HBRUSH background_brush_ = nullptr;
 
     HWND intro_text_ = nullptr;
-    HWND guide_text_ = nullptr;
+    std::wstring guide_text_;
     HWND language_label_ = nullptr;
     HWND language_button_ = nullptr;
     int language_index_ = 2;

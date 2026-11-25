@@ -240,21 +240,21 @@ constexpr BuiltinText kRewriteBuiltins[] = {
     {"resWelcomeTitle", L"Welcome to ALTRun", L"欢迎使用 ALTRun",
      L"歡迎使用 ALTRun"},
     {"resWelcomeIntro",
-     L"Two quick choices, then the basics of using the launcher.",
+     L"Two quick choices, then the basics.",
      L"先做两个选择，再看一眼基本用法。",
      L"先做兩個選擇，再看一眼基本用法。"},
     {"resWelcomeGuide",
-     L"Press %s to show or hide the launcher.\r\n"
-     L"Type a keyword and press Enter to run the selected shortcut.\r\n"
-     L"Items marked * need a parameter; enter it in the small prompt.\r\n"
+     L"Press [[%s]] to show or hide the launcher.\r\n"
+     L"Type a keyword and press [[Enter]] to run the selected shortcut.\r\n"
+     L"Shortcuts marked * need a parameter; press [[Enter]] in the prompt.\r\n"
      L"Right-click the tray icon for Settings, Shortcut Manager and Exit.",
-     L"按 %s 随时呼出或隐藏启动器。\r\n"
-     L"输入关键字后按 Enter 运行选中的快捷项。\r\n"
-     L"带 * 的条目需要参数，在小窗口输入后按 Enter。\r\n"
+     L"按 [[%s]] 随时呼出或隐藏启动器。\r\n"
+     L"输入关键字后按 [[Enter]] 运行选中的快捷项。\r\n"
+     L"带有 * 标记的快捷项需要参数，弹出窗口按 [[Enter]] 执行。\r\n"
      L"右键托盘图标可打开设置、快捷项管理和退出。",
-     L"按 %s 隨時呼出或隱藏啟動器。\r\n"
-     L"輸入關鍵字後按 Enter 執行選取的捷徑。\r\n"
-     L"帶 * 的項目需要參數，在小視窗輸入後按 Enter。\r\n"
+     L"按 [[%s]] 隨時呼出或隱藏啟動器。\r\n"
+     L"輸入關鍵字後按 [[Enter]] 執行選取的捷徑。\r\n"
+     L"帶有 * 標記的捷徑項目需要參數，彈出視窗按 [[Enter]] 執行。\r\n"
      L"右鍵點擊系統匣圖示可開啟設定、捷徑管理與結束。"},
     {"resWelcomeLanguage", L"Language", L"界面语言", L"介面語言"},
     {"resWelcomeAutoRun", L"Start ALTRun with Windows", L"随 Windows 启动",

@@ -565,9 +565,15 @@ void StrokeRounded(HDC dc, const RECT& rect, int radius, COLORREF color,
 }
 
 void DrawCard(HDC dc, const RECT& rect, int radius) {
+    // Two very soft layers: a 1px ambient lift plus a 3px contact shadow.
+    // Keeping the alpha low avoids the muddy edge that a single hard shadow
+    // produces on low-contrast displays.
+    RECT ambient = rect;
+    ::OffsetRect(&ambient, 0, 3);
+    FillRoundedArgb(dc, ambient, radius, kShadow, 22);
     RECT shadow = rect;
-    ::OffsetRect(&shadow, 0, 3);
-    FillRoundedArgb(dc, shadow, radius, kShadow, 40);
+    ::OffsetRect(&shadow, 0, 1);
+    FillRoundedArgb(dc, shadow, radius, kShadow, 34);
     FillRounded(dc, rect, radius, kSurface);
     RECT inner = InsetBy(rect, 1);
     StrokeRounded(dc, inner, std::max(1, radius - 1), kBorder);
@@ -592,8 +598,8 @@ void DrawTitleBar(HDC dc, HWND window, const std::wstring& title, HFONT title_fo
     HICON icon = AppIcon();
     if (icon != nullptr) {
         ::DrawIconEx(dc, Scale(window, 18),
-                     (title_height - icon_size) / 2, icon, icon_size, icon_size,
-                     0, nullptr, DI_NORMAL);
+                     (title_height - icon_size) / 2 + Scale(window, 1), icon,
+                     icon_size, icon_size, 0, nullptr, DI_NORMAL);
     }
 
     ::SetBkMode(dc, TRANSPARENT);
@@ -610,7 +616,7 @@ void DrawTitleBar(HDC dc, HWND window, const std::wstring& title, HFONT title_fo
 
     RECT close = CloseButtonRect(window, title_height);
     if (IsCloseHot(window)) {
-        FillRounded(dc, close, Scale(window, 8), RGB(253, 231, 233));
+        FillRounded(dc, close, Scale(window, 17), RGB(238, 242, 247));
     }
     DrawCloseGlyph(dc, close, IsCloseHot(window) ? kDanger : kTextSecondary);
 }
