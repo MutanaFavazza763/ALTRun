@@ -5,6 +5,7 @@
 #include <strsafe.h>
 
 #include <string>
+#include <vector>
 
 #include "app/DesktopSpace.h"
 #include "app/ShellIntegration.h"
@@ -30,6 +31,122 @@ constexpr UINT kTrayMenuConfig = 101;
 constexpr UINT kTrayMenuExit = 102;
 constexpr UINT kTrayMenuManager = 103;
 constexpr UINT kTrayMenuAbout = 104;
+
+DWORD ProcessIntegrityRid() {
+    HANDLE token = nullptr;
+    if (!::OpenProcessToken(::GetCurrentProcess(), TOKEN_QUERY, &token)) {
+        return SECURITY_MANDATORY_MEDIUM_RID;
+    }
+    DWORD needed = 0;
+    ::GetTokenInformation(token, TokenIntegrityLevel, nullptr, 0, &needed);
+    if (needed == 0) {
+        ::CloseHandle(token);
+        return SECURITY_MANDATORY_MEDIUM_RID;
+    }
+    std::vector<BYTE> buffer(needed);
+    auto* label = reinterpret_cast<TOKEN_MANDATORY_LABEL*>(buffer.data());
+    DWORD rid = SECURITY_MANDATORY_MEDIUM_RID;
+    if (::GetTokenInformation(token, TokenIntegrityLevel, label, needed, &needed)) {
+        const DWORD count = *::GetSidSubAuthorityCount(label->Label.Sid);
+        if (count > 0) {
+            rid = *::GetSidSubAuthority(label->Label.Sid, count - 1);
+        }
+    }
+    ::CloseHandle(token);
+    return rid;
+}
+
+bool IsLowIntegrityProcess() {
+    return ProcessIntegrityRid() < SECURITY_MANDATORY_MEDIUM_RID;
+}
+
+// Windows 11 keeps new notification icons in the overflow flyout unless the
+// per-application IsPromoted value is set.  The shell creates this key on the
+// first NIM_ADD, keyed by a machine-local hash, so it has to be looked up by
+// ExecutablePath rather than by a fixed name.
+std::wstring FindNotificationIconKey(const std::wstring& exe_path) {
+    HKEY root = nullptr;
+    if (::RegOpenKeyExW(HKEY_CURRENT_USER, L"Control Panel\\NotifyIconSettings",
+                        0, KEY_READ, &root) != ERROR_SUCCESS) {
+        return {};
+    }
+    std::wstring result;
+    for (DWORD index = 0;; ++index) {
+        wchar_t subkey[256] = {};
+        DWORD subkey_length = static_cast<DWORD>(std::size(subkey));
+        const LSTATUS status =
+            ::RegEnumKeyExW(root, index, subkey, &subkey_length, nullptr, nullptr,
+                            nullptr, nullptr);
+        if (status == ERROR_NO_MORE_ITEMS) {
+            break;
+        }
+        if (status != ERROR_SUCCESS) {
+            continue;
+        }
+        HKEY child = nullptr;
+        if (::RegOpenKeyExW(root, subkey, 0, KEY_READ, &child) != ERROR_SUCCESS) {
+            continue;
+        }
+        wchar_t path[2048] = {};
+        DWORD path_size = static_cast<DWORD>(sizeof(path));
+        DWORD type = 0;
+        if (::RegQueryValueExW(child, L"ExecutablePath", nullptr, &type,
+                               reinterpret_cast<LPBYTE>(path), &path_size) ==
+                ERROR_SUCCESS &&
+            type == REG_SZ && ::_wcsicmp(path, exe_path.c_str()) == 0) {
+            result = subkey;
+            ::RegCloseKey(child);
+            break;
+        }
+        ::RegCloseKey(child);
+    }
+    ::RegCloseKey(root);
+    return result;
+}
+
+bool NotificationIconHasPromotionValue(const std::wstring& subkey) {
+    if (subkey.empty()) {
+        return false;
+    }
+    HKEY key = nullptr;
+    if (::RegOpenKeyExW(HKEY_CURRENT_USER,
+                        (L"Control Panel\\NotifyIconSettings\\" + subkey).c_str(),
+                        0, KEY_READ, &key) != ERROR_SUCCESS) {
+        return false;
+    }
+    DWORD value = 0;
+    DWORD size = sizeof(value);
+    DWORD type = 0;
+    const bool found =
+        ::RegQueryValueExW(key, L"IsPromoted", nullptr, &type,
+                           reinterpret_cast<LPBYTE>(&value), &size) == ERROR_SUCCESS &&
+        type == REG_DWORD;
+    ::RegCloseKey(key);
+    return found;
+}
+
+void PromoteNotificationIcon(const std::wstring& subkey) {
+    if (subkey.empty()) {
+        return;
+    }
+    HKEY key = nullptr;
+    if (::RegOpenKeyExW(HKEY_CURRENT_USER,
+                        (L"Control Panel\\NotifyIconSettings\\" + subkey).c_str(),
+                        0, KEY_SET_VALUE, &key) != ERROR_SUCCESS) {
+        return;
+    }
+    const DWORD promoted = 1;
+    const LSTATUS status =
+        ::RegSetValueExW(key, L"IsPromoted", 0, REG_DWORD,
+                         reinterpret_cast<const BYTE*>(&promoted), sizeof(promoted));
+    ::RegCloseKey(key);
+    if (status == ERROR_SUCCESS) {
+        Logger::Instance().Info("tray icon promoted to the visible notification area");
+    } else {
+        Logger::Instance().Warn("cannot promote tray icon, error=" +
+                                std::to_string(status));
+    }
+}
 
 // "Alt + R" style text is stored in the settings; this is the fallback used
 // when neither the ini nor the legacy defaults produce a valid hotkey.
@@ -70,7 +187,11 @@ App::App(HINSTANCE instance)
       config_window_(settings_),
       manager_window_(settings_, store_),
       about_window_(settings_),
-      welcome_window_(settings_) {}
+      welcome_window_(settings_) {
+    // Explorer broadcasts this when it restarts; the old tray registration is
+    // gone at that point, so it must be re-added.
+    taskbar_created_message_ = ::RegisterWindowMessageW(L"TaskbarCreated");
+}
 
 App::~App() {
     RemoveTrayIcon();
@@ -182,8 +303,9 @@ int App::Run() {
         }
     }
 
+    bool tray_ready = false;
     if (settings_.show_tray_icon) {
-        AddTrayIcon();
+        tray_ready = AddTrayIcon();
     }
     ApplyAutoRun(settings_.auto_run);
 
@@ -200,6 +322,15 @@ int App::Run() {
     if (show_welcome && welcome_window_.hwnd() != nullptr) {
         welcome_window_.Open();
     } else if (settings_.show_me_when_start || HasFlag(L"--show")) {
+        main_window_.ShowLauncher();
+    } else if (settings_.show_tray_icon && !tray_ready &&
+               !HasFlag(L"--config") && !HasFlag(L"--manager") &&
+               !HasFlag(L"--about")) {
+        // Never leave a working process with no visible entry point.  A low
+        // integrity folder (files copied by a restricted tool) cannot talk to
+        // Explorer, so the tray registration is denied with error 5.
+        Logger::Instance().Warn(
+            "tray icon unavailable; showing the launcher instead of running hidden");
         main_window_.ShowLauncher();
     }
 
@@ -253,6 +384,14 @@ void App::NotifyExistingInstance() {
 
 LRESULT App::HandleExternalMessage(HWND hwnd, UINT message, WPARAM wparam,
                                    LPARAM lparam) {
+    if (taskbar_created_message_ != 0 && message == taskbar_created_message_) {
+        // Explorer restarted: the shell forgot every notification icon.
+        RemoveTrayIcon();
+        if (settings_.show_tray_icon) {
+            AddTrayIcon();
+        }
+        return 0;
+    }
     switch (message) {
         case WM_HOTKEY:
             if (wparam == kHotkeyIdToggle || wparam == kHotkeyIdToggle2) {
@@ -355,11 +494,15 @@ void App::ShowTrayMenu() {
     ::DestroyMenu(menu);
 }
 
-void App::AddTrayIcon() {
+bool App::AddTrayIcon() {
     HWND hwnd = main_window_.hwnd();
     if (hwnd == nullptr) {
-        return;
+        return false;
     }
+    const std::wstring exe_path = ExePath();
+    const std::wstring existing_key = FindNotificationIconKey(exe_path);
+    const bool promotion_was_explicit =
+        NotificationIconHasPromotionValue(existing_key);
     tray_icon_ = {};
     tray_icon_.cbSize = sizeof(tray_icon_);
     tray_icon_.hWnd = hwnd;
@@ -367,13 +510,46 @@ void App::AddTrayIcon() {
     tray_icon_.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     tray_icon_.uCallbackMessage = kTrayCallbackMessage;
     tray_icon_.hIcon = ::LoadIconW(nullptr, IDI_APPLICATION);
+    if (tray_icon_.hIcon == nullptr) {
+        Logger::Instance().Warn("cannot load the tray icon");
+        return false;
+    }
     ::StringCchCopyW(tray_icon_.szTip, std::size(tray_icon_.szTip),
                      Localization::Instance().Get("resTrayTip").c_str());
-    tray_visible_ = ::Shell_NotifyIconW(NIM_ADD, &tray_icon_) != FALSE;
-    if (!tray_visible_) {
-        Logger::Instance().Warn("failed to add tray icon, error=" +
-                                std::to_string(::GetLastError()));
+
+    // A freshly logged-in shell can still be starting; retry briefly instead of
+    // giving up on the first NIM_ADD.  The TaskbarCreated broadcast covers the
+    // Explorer-restart case later.
+    DWORD error = 0;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        if (::Shell_NotifyIconW(NIM_ADD, &tray_icon_) != FALSE) {
+            tray_visible_ = true;
+            // Windows 11 puts every new icon in the overflow flyout.  Promote
+            // it once, but never override an explicit user choice (0) made
+            // later in Settings > Taskbar.
+            if (!promotion_was_explicit) {
+                const std::wstring key = FindNotificationIconKey(exe_path);
+                if (!key.empty()) {
+                    PromoteNotificationIcon(key);
+                }
+            }
+            Logger::Instance().Info("tray icon added");
+            return true;
+        }
+        error = ::GetLastError();
+        if (attempt < 2) {
+            ::Sleep(250);
+        }
     }
+    tray_visible_ = false;
+    std::string detail = "failed to add tray icon, error=" + std::to_string(error);
+    if (IsLowIntegrityProcess()) {
+        detail += " (process integrity is low: the executable folder carries a "
+                  "Low mandatory label, so Explorer rejects the icon and SendTo "
+                  "writes; move it to a normal folder)";
+    }
+    Logger::Instance().Warn(detail);
+    return false;
 }
 
 void App::RemoveTrayIcon() {
@@ -396,6 +572,12 @@ void App::ApplySettings() {
 
     Logger::Instance().SetEnabled(settings_.trace_enabled);
     ApplyAutoRun(settings_.auto_run);
+    // ShowTrayIcon can be toggled from the settings dialog; recreate the icon
+    // so the checkbox takes effect immediately.
+    RemoveTrayIcon();
+    if (settings_.show_tray_icon) {
+        AddTrayIcon();
+    }
     // Language may have changed (ConfigWindow writes [GUI] Lang): select the
     // new built-in locale before the launcher re-renders.
     Localization::Instance().Load(settings_.lang);

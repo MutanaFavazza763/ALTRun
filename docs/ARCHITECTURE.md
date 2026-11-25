@@ -283,6 +283,7 @@ Rank = freq*1000 - 4*(S[1]-'A') - 2*(S[2]-'A') - 1*(S[3]-'A') - Length(S)
 | D28 | 结果列表按**像素列**绘制，不依赖 `%-25s` 的空格对齐；超长文本以省略号截断 | 比例字体（Segoe UI 等）的空格宽度远小于字母，按字符数填充必然错列，12pt/14pt 下旧截图还会把第二列顶出右边界。`FormatListParts()` 只对两个占位符且中间是竖线的格式启用分列（`%s (%s)` 等仍按整行绘制），列宽取可见行"前缀+关键字"的最宽值并限制在 58% 内 |
 | D29 | 首次启动（无 ini）弹欢迎向导：语言、随 Windows 启动、发送到菜单 + 四条用法；默认语言取系统 UI 语言 | 原版首启只弹语言选择与两个系统集成询问，没有使用说明，用户不知道热键和参数星号；向导在选语言后才生成默认快捷项名，避免英文界面配中文默认名。接受后写 ini，因此只出现一次 |
 | D30 | 便携包里的样例配置命名 `ALTRun.ini.sample`，不随包提供可用的 `ALTRun.ini` | `Settings::Load()` 以 exe 同目录或 roaming 是否存在 `ALTRun.ini` 判断首次启动；包里放真实 ini 会让首启向导永远不弹。样例只供查键名，用户双击 exe 仍是干净首启 |
+| D31 | 托盘图标按 Windows 11 的通知区规则注册：启动重试 3 次、处理 `TaskbarCreated` 重建、首次把本 exe 的 `IsPromoted` 设为 1；无法注册时自动显示启动器 | Win11 把新图标默认塞进 `^` 溢出区，用户会以为程序没图标；`NotifyIconSettings\<hash>` 的 `IsPromoted=1` 才能常驻可见。只在没有显式值（或首次注册）时设一次，用户后来在“任务栏设置”里关掉（`IsPromoted=0`）不覆盖。若目录带 Low 完整性标签，低 IL 进程无法与 Explorer 通信（`Shell_NotifyIcon` 返回错误 5），此时显示主窗口避免“后台有进程但没有任何入口” |
 
 ## 13. 构建、测试与打包
 
@@ -297,7 +298,7 @@ cmake --build build/vs --config Release
 ctest --test-dir build/vs -C Release      # 或通过 CTest 运行
 
 # 便携版打包（exe + res + 文档 + 样例 ALTRun.ini → dist/ALTRun-<版本>-win64.zip）
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -Version 2.0.4
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1 -Version 2.0.5
 ```
 
 或使用预设：`cmake --preset msvc-release` / `cmake --build --preset release`（Ninja）。

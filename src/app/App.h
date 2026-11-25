@@ -40,7 +40,7 @@ private:
     void ReleaseSingleInstance();
     void NotifyExistingInstance();
 
-    void AddTrayIcon();
+    bool AddTrayIcon();
     void RemoveTrayIcon();
     // Registers/unregisters all three global hotkeys against the launcher
     // window. They are tied to a window handle, so a rebuilt window needs them
@@ -83,6 +83,7 @@ private:
 
     NOTIFYICONDATAW tray_icon_ = {};
     bool tray_visible_ = false;
+    UINT taskbar_created_message_ = 0;
     bool quitting_ = false;
 };
 

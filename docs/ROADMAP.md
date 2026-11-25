@@ -165,6 +165,21 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 空目录首启看到中文向导，选 English 后默认列表名为 `My Computer`。
 证据：`07-evidence/first-run/`。
 
+## M10 — 托盘图标可见性与恢复（✅，2.0.5）
+
+- [x] `AddTrayIcon` 启动重试 3 次，返回成功/失败；失败时记录 `GetLastError`
+- [x] 处理 Explorer 的 `TaskbarCreated` 广播，重启资源管理器后自动重建图标
+- [x] Win11 首次注册后把本 exe 的 `IsPromoted` 设为 1，避免图标只躺在 `^` 溢出区；
+      已显式设为 0（用户主动隐藏）时不覆盖
+- [x] `IsPromoted=0/1` 在设置页切换“显示托盘图标”时立即生效（删除后重加）
+- [x] 识别 Low 完整性进程：Shell 拒绝图标时日志给出目录完整性原因，并自动显示
+      启动器，不再出现“有进程、没图标、也没窗口”
+- [x] 验证：低 IL 目录得到错误 5 + 启动器回退；改为 Medium 后图标注册成功；
+      UI Automation 在任务栏可见区找到 `ALTRun - Alt+R to open`
+
+验收：正常目录启动后任务栏可见区出现 ALTRun 图标，Explorer 重启后仍在；
+低完整性目录不会静默驻留。证据：`07-evidence/tray/`。
+
 ## 后续可选增强（⏳）
 
 - [ ] `frmLang` 语言下拉框（现在要手改 `[GUI] Lang`）

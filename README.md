@@ -52,7 +52,10 @@ M5 外观与系统集成：
   `.lnk` 解析、相对/绝对路径转换、导入/导出，编辑后立即写回 `ShortCutList.txt`
 - **数据格式与旧版逐字节兼容**：`ShortCutList.txt`（GBK）、`FavoriteList.txt`、
   `ParamHistory.txt`、`ALTRun.ini`（含 `[DEBUG] LatestList`）
-- 绿色便携：所有配置与数据都在 exe 同目录，不写注册表配置
+- 绿色便携：应用配置与数据都在 exe 同目录；唯一的注册表写入是 Windows 11
+  通知图标的可见性 `IsPromoted`（首次注册时设一次，用户之后手动关掉不再覆盖）
+- 托盘图标：启动时重试、Explorer 重启后自动重建；Win11 首次注册自动放到可见区；
+  若程序位于 Low 完整性目录导致 Shell 拒绝图标，则自动显示启动器而不再静默驻留
 - 中文界面与 IME 输入、Win11 圆角暗色窗口
 - 三种内置语言：`[GUI] Lang=zh_cn` / `zh_hk` / `en_us`，整窗切换
   （5 个窗口 + 托盘 + 默认列表名）；原版 224 键三语言表内置，不再读取外置
