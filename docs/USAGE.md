@@ -166,14 +166,15 @@ RoundBorderRadius=12
 ListFormat=%-25s| %s
 BGFileName=BG.jpg
 Lang=zh_cn
+Theme=system          ; system=跟随 Windows，light=浅色，dark=深色
 ```
 
 更多键与语义见 [spec/02-config-options.md](spec/02-config-options.md)。
 
 ## 10. 已知限制
 
-- 启动器仍使用暗色 D2D 面板；设置/关于为 WinUI 3，首启向导、管理器与编辑框为自绘浅色
-  Fluent 控件，三套窗口的标题栏与背景不完全一致；
+- 外观页现在直接提供主题菜单（跟随 Windows / 浅色 / 深色）与皮肤文件选择器；`Theme` 会写入
+  `[GUI]`，皮肤文件可选 exe 旁的 JPG/PNG/BMP。启动器的完整深色 D2D 色板仍列入后续统一工作；
 - 语言由 `[GUI] Lang` 决定，只支持三种内置值：
   `zh_cn`（简体中文）、`zh_hk`（繁体中文）、`en_us`（英语）。
   所有界面文案都已内置，**不会读取** exe 旁的 `.lang` 或 `About.<Lang>` 文件；

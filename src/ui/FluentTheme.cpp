@@ -678,7 +678,9 @@ void DrawNavItem(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
         FillRounded(dc, rect, Scale(::GetActiveWindow(), 8), kAccentSoft);
         RECT indicator = {rect.left, rect.top + 4, rect.left + 3,
                           rect.bottom - 4};
-        ::FillRect(dc, &indicator, ::CreateSolidBrush(kAccent));
+        HBRUSH brush = ::CreateSolidBrush(kAccent);
+        ::FillRect(dc, &indicator, brush);
+        ::DeleteObject(brush);
     } else if (hover) {
         FillRounded(dc, rect, Scale(::GetActiveWindow(), 8), RGB(237, 245, 255));
     }
@@ -832,7 +834,9 @@ void DrawRadio(HDC dc, const RECT& rect, const std::wstring& text, HFONT font,
 }
 
 void DrawSeparator(HDC dc, const RECT& rect) {
-    ::FillRect(dc, &rect, ::CreateSolidBrush(kDivider));
+    HBRUSH brush = ::CreateSolidBrush(kDivider);
+    ::FillRect(dc, &rect, brush);
+    ::DeleteObject(brush);
 }
 
 HWND CreateToggle(HWND parent, HINSTANCE instance, int id, const std::wstring& text,

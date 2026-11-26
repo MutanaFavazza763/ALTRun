@@ -45,7 +45,6 @@ private:
                      int x, int y, int width, int height, int id);
     void ApplyFont(HWND control) const;
     void RefreshTexts();
-    void ShowLanguageMenu();
     void UpdateLanguageButton();
     void PlaceOnCursorMonitor();
     void DrawHeader(HDC dc) const;

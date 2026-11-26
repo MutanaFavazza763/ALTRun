@@ -46,6 +46,8 @@ struct Settings {
 
     // [GUI]
     std::string bg_file_name = "BG.jpg";  // BGFileName
+    // UI theme: system follows Windows, light/dark force the app surfaces.
+    std::string theme = "system";
     // TitleFont / KeywordFont / ListFont: legacy 5-segment font strings
     // (<family>|[]|12|65535|0); parsed by core/FontSpec.
     std::string title_font = "Segoe UI|[]|12|65535|0";    // TitleFont

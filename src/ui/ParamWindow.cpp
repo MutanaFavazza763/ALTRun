@@ -280,7 +280,14 @@ void ParamWindow::DrawFrame() {
 
     // OK button.
     const D2D1_RECT_F ok = OkButtonRect();
-    d2d_.FillRoundedRect(ok, 6.0f, kAccent);
+    const D2D1_COLOR_F ok_fill = ok_pressed_ ? D2D1::ColorF(0.0f, 0.353f, 0.667f, 1.0f)
+                                             : (ok_hover_ ? D2D1::ColorF(0.102f, 0.549f, 0.894f, 1.0f)
+                                                          : kAccent);
+    d2d_.FillRoundedRect(ok, 6.0f, ok_fill);
+    if (ok_hover_) {
+        d2d_.DrawRoundedBorder(ok, 6.0f, D2D1::ColorF(0.0f, 0.353f, 0.667f, 0.45f),
+                               1.0f);
+    }
     IDWriteTextFormat* centered = hint_format_.Get();
     centered->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
     d2d_.DrawTextBlock(Loc("Common.BtnOK"), centered, ok,
@@ -382,13 +389,33 @@ LRESULT ParamWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
                     break;
             }
             break;
+        case WM_MOUSEMOVE: {
+            const POINT pt = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+            const D2D1_RECT_F ok = OkButtonRect();
+            const bool hot = pt.x >= ok.left && pt.x < ok.right && pt.y >= ok.top &&
+                             pt.y < ok.bottom;
+            if (hot != ok_hover_) {
+                ok_hover_ = hot;
+                ::InvalidateRect(hwnd_, nullptr, FALSE);
+            }
+            TRACKMOUSEEVENT track = {sizeof(TRACKMOUSEEVENT), TME_LEAVE, hwnd_, 0};
+            ::TrackMouseEvent(&track);
+            break;
+        }
+        case WM_MOUSELEAVE:
+            ok_hover_ = false;
+            ok_pressed_ = false;
+            ::InvalidateRect(hwnd_, nullptr, FALSE);
+            break;
         case WM_LBUTTONDOWN: {
             ResetIdleTimer();
             const POINT pt = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
             const D2D1_RECT_F ok = OkButtonRect();
             if (pt.x >= ok.left && pt.x <= ok.right && pt.y >= ok.top &&
                 pt.y <= ok.bottom) {
-                Confirm();
+                ok_pressed_ = true;
+                ::SetCapture(hwnd_);
+                ::InvalidateRect(hwnd_, nullptr, FALSE);
                 return 0;
             }
             for (size_t row = 0; row < VisibleHistoryRows(); ++row) {
@@ -404,6 +431,22 @@ LRESULT ParamWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
                     return 0;
                 }
             }
+            return 0;
+        }
+        case WM_LBUTTONUP: {
+            const bool was_pressed = ok_pressed_;
+            ok_pressed_ = false;
+            if (::GetCapture() == hwnd_) {
+                ::ReleaseCapture();
+            }
+            const POINT pt = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+            const D2D1_RECT_F ok = OkButtonRect();
+            const bool inside = pt.x >= ok.left && pt.x <= ok.right &&
+                                pt.y >= ok.top && pt.y <= ok.bottom;
+            if (was_pressed && inside) {
+                Confirm();
+            }
+            ::InvalidateRect(hwnd_, nullptr, FALSE);
             return 0;
         }
         case WM_TIMER:

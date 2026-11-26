@@ -7,12 +7,12 @@
 #include <windowsx.h>
 
 #include <string>
+#include <algorithm>
 #include <vector>
 
 #include "core/Localization.h"
 #include "core/Logger.h"
 #include "core/Text.h"
-#include "ui/FluentMenu.h"
 #include "ui/FluentTheme.h"
 #include "ui/UiText.h"
 
@@ -45,7 +45,6 @@ constexpr int kButtonY = 428;
 
 constexpr int kIdStart = IDOK;
 constexpr int kIdLanguage = 3001;
-constexpr int kIdLanguageFirst = 3100;
 
 const wchar_t* const kLanguageNames[3] = {L"简体中文", L"繁體中文", L"English"};
 const char* const kLanguageValues[3] = {"zh_cn", "zh_hk", "en_us"};
@@ -177,11 +176,15 @@ void WelcomeWindow::CreateControls() {
 
     language_label_ = MakeControl(WC_STATICW, L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
                                    kMargin + 24, kLanguageLabelY, 160, 24, 0);
-    language_button_ = fluent::CreateButton(
-        hwnd_, instance_, kIdLanguage, L"", font_, 200, 36, dpi_, false, true);
+    language_button_ = ::CreateWindowExW(
+        0, WC_COMBOBOXW, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP |
+        CBS_DROPDOWNLIST | CBS_HASSTRINGS, S(kMargin + 24), S(kLanguageComboY),
+        S(200), S(220), hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdLanguage)),
+        instance_, nullptr);
     if (language_button_ != nullptr) {
-        ::SetWindowPos(language_button_, nullptr, S(kMargin + 24),
-                       S(kLanguageComboY), 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        ::SendMessageW(language_button_, WM_SETFONT,
+                       reinterpret_cast<WPARAM>(font_), TRUE);
+        ::SetWindowTheme(language_button_, L"Explorer", nullptr);
     }
 
     auto_run_check_ = fluent::CreateToggle(
@@ -439,31 +442,14 @@ void WelcomeWindow::UpdateLanguageButton() {
     if (language_button_ == nullptr) {
         return;
     }
-    std::wstring label = kLanguageNames[language_index_];
-    ::SetWindowTextW(language_button_, label.c_str());
+    ::SendMessageW(language_button_, CB_RESETCONTENT, 0, 0);
+    for (const wchar_t* name : kLanguageNames) {
+        ::SendMessageW(language_button_, CB_ADDSTRING, 0,
+                       reinterpret_cast<LPARAM>(name));
+    }
+    ::SendMessageW(language_button_, CB_SETCURSEL,
+                   static_cast<WPARAM>(std::clamp(language_index_, 0, 2)), 0);
     ::InvalidateRect(language_button_, nullptr, TRUE);
-}
-
-void WelcomeWindow::ShowLanguageMenu() {
-    if (language_button_ == nullptr) {
-        return;
-    }
-    RECT button = {};
-    ::GetWindowRect(language_button_, &button);
-    POINT point = {button.left, button.bottom + 4};
-    std::vector<fluent::MenuItem> items;
-    for (int index = 0; index < 3; ++index) {
-        std::wstring label = index == language_index_ ? L"\u2713  " : L"     ";
-        label += kLanguageNames[index];
-        items.push_back({kIdLanguageFirst + index, label, L"", false, false,
-                         true});
-    }
-    const int command = fluent::ShowPopupMenu(
-        hwnd_, instance_, point, Loc("resWelcomeLanguage"), L"", nullptr, items);
-    if (command >= kIdLanguageFirst && command < kIdLanguageFirst + 3) {
-        language_index_ = command - kIdLanguageFirst;
-        UpdateLanguageButton();
-    }
 }
 
 void WelcomeWindow::Accept() {
@@ -506,8 +492,11 @@ LRESULT WelcomeWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam)
                 Accept();
                 return 0;
             }
-            if (HIWORD(wparam) == BN_CLICKED && LOWORD(wparam) == kIdLanguage) {
-                ShowLanguageMenu();
+            if (HIWORD(wparam) == CBN_SELCHANGE && LOWORD(wparam) == kIdLanguage) {
+                const LRESULT selected = ::SendMessageW(language_button_, CB_GETCURSEL, 0, 0);
+                if (selected >= 0 && selected < 3) {
+                    language_index_ = static_cast<int>(selected);
+                }
                 return 0;
             }
             return 0;

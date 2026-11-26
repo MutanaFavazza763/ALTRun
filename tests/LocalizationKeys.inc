@@ -320,4 +320,11 @@ const char* const kLocalizationKeys[] = {
     "resWelcomeStart",
     "resCopyPath",
     "resAdvancedHint",
+    "resTheme",
+    "resThemeSystem",
+    "resThemeLight",
+    "resThemeDark",
+    "resSkinFile",
+    "resPickSkin",
+    "resSkinHint",
 };

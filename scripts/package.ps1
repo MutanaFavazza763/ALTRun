@@ -159,6 +159,7 @@ RoundBorderRadius=12
 ListFormat=%-25s| %s
 BGFileName=BG.jpg
 Lang=en_us
+Theme=system
 TitleFont=Segoe UI|[]|12|65535|0
 KeywordFont=Segoe UI|[]|16|16777215|0
 ListFont=Segoe UI|[]|14|16777215|0

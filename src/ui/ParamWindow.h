@@ -76,6 +76,8 @@ private:
     HBRUSH edit_brush_ = nullptr;
     std::vector<ParamHistoryItem> shown_;
     int selected_ = -1;
+    bool ok_hover_ = false;
+    bool ok_pressed_ = false;
     std::wstring item_label_;
     ConfirmHandler on_confirm_;
 };

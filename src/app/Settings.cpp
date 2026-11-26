@@ -231,6 +231,10 @@ void Settings::Load() {
     win_left = ReadInt(ini, L"Window", L"WinLeft", win_left);
 
     bg_file_name = ReadString(ini, L"GUI", L"BGFileName", bg_file_name);
+    theme = ReadString(ini, L"GUI", L"Theme", theme);
+    if (theme != "light" && theme != "dark" && theme != "system") {
+        theme = "system";
+    }
     // Empty values fall back to the current (default) font strings, matching
     // the original "empty -> DEFAULT_*_FONT_STR" rule (spec §1.5).
     title_font = ReadString(ini, L"GUI", L"TitleFont", title_font);
@@ -284,6 +288,7 @@ bool Settings::Save() const {
     WriteInt(ini, L"Window", L"WinLeft", win_left);
 
     WriteStr(ini, L"GUI", L"BGFileName", bg_file_name);
+    WriteStr(ini, L"GUI", L"Theme", theme);
     WriteStr(ini, L"GUI", L"TitleFont", title_font);
     WriteStr(ini, L"GUI", L"KeywordFont", keyword_font);
     WriteStr(ini, L"GUI", L"ListFont", list_font);

@@ -156,6 +156,26 @@ void D2DContext::FillRoundedRect(const D2D1_RECT_F& rect, float radius,
     }
 }
 
+void D2DContext::DrawEllipse(const D2D1_ELLIPSE& ellipse,
+                             const D2D1_COLOR_F& color, float width) {
+    if (!target_) {
+        return;
+    }
+    if (ID2D1SolidColorBrush* brush = Brush(color)) {
+        target_->DrawEllipse(ellipse, brush, width);
+    }
+}
+
+void D2DContext::DrawLine(const D2D1_POINT_2F& from, const D2D1_POINT_2F& to,
+                          const D2D1_COLOR_F& color, float width) {
+    if (!target_) {
+        return;
+    }
+    if (ID2D1SolidColorBrush* brush = Brush(color)) {
+        target_->DrawLine(from, to, brush, width);
+    }
+}
+
 void D2DContext::DrawRoundedBorder(const D2D1_RECT_F& rect, float radius,
                                    const D2D1_COLOR_F& color, float width) {
     if (!target_) {

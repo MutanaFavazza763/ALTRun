@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
 #include <shellapi.h>
+#include <commdlg.h>
+#pragma comment(lib, "comdlg32.lib")
 #if __has_include("MainWindow.g.cpp")
 #include "MainWindow.g.cpp"
 #endif
@@ -147,6 +149,17 @@ std::string U8(hstring const& value) {
     return alt::ToUtf8(std::wstring(value));
 }
 
+void ApplyTheme(Microsoft::UI::Xaml::Controls::Grid const& root,
+                std::string const& theme) {
+    if (theme == "dark") {
+        root.RequestedTheme(Microsoft::UI::Xaml::ElementTheme::Dark);
+    } else if (theme == "light") {
+        root.RequestedTheme(Microsoft::UI::Xaml::ElementTheme::Light);
+    } else {
+        root.RequestedTheme(Microsoft::UI::Xaml::ElementTheme::Default);
+    }
+}
+
 const wchar_t* const kLanguageNames[3] = {L"简体中文", L"繁體中文", L"English"};
 const char* const kLanguageValues[3] = {"zh_cn", "zh_hk", "en_us"};
 
@@ -257,6 +270,12 @@ void MainWindow::ApplyLocalization() {
     LanguageLabel().Text(H("ConfigForm.LblLanguage"));
     UpdateLanguageButton();
     SetTextHeader(BackgroundBox(), "ConfigForm.LblBackGroundImage");
+    ThemeLabel().Text(H("resTheme"));
+    SkinFileLabel().Text(H("resSkinFile"));
+    SkinHint().Text(H("resSkinHint"));
+    ThemeSystemItem().Text(H("resThemeSystem"));
+    ThemeLightItem().Text(H("resThemeLight"));
+    ThemeDarkItem().Text(H("resThemeDark"));
 
     DisplayCardTitle().Text(H("resFluentSettingsDisplay"));
     SetTextHeader(ListFormatBox(), "resListFormat");
@@ -323,6 +342,14 @@ void MainWindow::LoadSettings() {
     RadiusBox().Maximum(200);
 
     BackgroundBox().Text(hstring(alt::ToWide(settings_.bg_file_name)));
+    theme_value_ = settings_.theme;
+    if (theme_value_ != "light" && theme_value_ != "dark" && theme_value_ != "system") {
+        theme_value_ = "system";
+    }
+    const char* theme_key = theme_value_ == "dark" ? "resThemeDark" :
+                            (theme_value_ == "light" ? "resThemeLight" : "resThemeSystem");
+    ThemeButtonText().Text(H(theme_key));
+    ApplyTheme(Root(), theme_value_);
     ListFormatBox().Text(hstring(alt::ToWide(settings_.list_format)));
 
     ShowSkinToggle().IsOn(settings_.show_skin);
@@ -412,6 +439,7 @@ void MainWindow::SaveSettings() {
         static_cast<int>(RadiusBox().Value()), 0, 200);
 
     settings_.bg_file_name = alt::TrimAscii(U8(BackgroundBox().Text()));
+    settings_.theme = theme_value_;
     settings_.list_format = alt::TrimAscii(U8(ListFormatBox().Text()));
 
     settings_.show_skin = ShowSkinToggle().IsOn();
@@ -465,6 +493,43 @@ void MainWindow::OnLanguageItemClick(
             UpdateLanguageButton();
             break;
         }
+    }
+}
+
+void MainWindow::OnThemeItemClick(
+    IInspectable const& sender, RoutedEventArgs const&) {
+    auto item = sender.try_as<MenuFlyoutItem>();
+    if (!item || !item.Tag()) {
+        return;
+    }
+    theme_value_ = winrt::to_string(winrt::unbox_value<hstring>(item.Tag()));
+    const char* theme_key = theme_value_ == "dark" ? "resThemeDark" :
+                            (theme_value_ == "light" ? "resThemeLight" : "resThemeSystem");
+    ThemeButtonText().Text(H(theme_key));
+    ApplyTheme(Root(), theme_value_);
+}
+
+void MainWindow::OnPickSkinClick(IInspectable const&, RoutedEventArgs const&) {
+    wchar_t path[MAX_PATH * 4] = {};
+    OPENFILENAMEW dialog = {};
+    dialog.lStructSize = sizeof(dialog);
+    dialog.hwndOwner = reinterpret_cast<HWND>(AppWindow().Id().Value);
+    dialog.lpstrFilter = L"Images\0*.jpg;*.jpeg;*.png;*.bmp\0All files\0*.*\0";
+    dialog.lpstrFile = path;
+    dialog.nMaxFile = static_cast<DWORD>(std::size(path));
+    dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+    if (::GetOpenFileNameW(&dialog) == FALSE) {
+        return;
+    }
+    const std::wstring selected(path);
+    const std::wstring directory = ExeDirectory();
+    if (selected.size() >= directory.size() &&
+        ::CompareStringOrdinal(selected.c_str(), static_cast<int>(directory.size()),
+                               directory.c_str(), static_cast<int>(directory.size()),
+                               TRUE) == CSTR_EQUAL) {
+        BackgroundBox().Text(hstring(selected.substr(directory.size())));
+    } else {
+        BackgroundBox().Text(hstring(selected));
     }
 }
 

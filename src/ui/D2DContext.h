@@ -48,6 +48,10 @@ public:
     void FillRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& color);
     void FillRoundedRect(const D2D1_RECT_F& rect, float radius,
                          const D2D1_COLOR_F& color);
+    void DrawEllipse(const D2D1_ELLIPSE& ellipse, const D2D1_COLOR_F& color,
+                     float width = 1.0f);
+    void DrawLine(const D2D1_POINT_2F& from, const D2D1_POINT_2F& to,
+                  const D2D1_COLOR_F& color, float width = 1.0f);
     void DrawRoundedBorder(const D2D1_RECT_F& rect, float radius,
                            const D2D1_COLOR_F& color, float width = 1.0f);
     // Stretches bitmap into dest; used for the skinned background.

@@ -439,7 +439,7 @@ float MainWindow::MeasureWidth(const std::wstring& text,
 
 D2D1_RECT_F MainWindow::InputRect() const {
     const float top = kPad + kHeaderHeight;
-    return D2D1::RectF(kPad + 14.0f, top, settings_.form_width - kPad - 14.0f,
+    return D2D1::RectF(kPad + 36.0f, top, settings_.form_width - kPad - 14.0f,
                        top + kInputHeight);
 }
 
@@ -501,9 +501,15 @@ void MainWindow::DrawFrame() {
     const std::wstring count = FormatCount(Loc("resItemCount"), store_.item_count());
     IDWriteTextFormat* right = title_format_.Get();
     right->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+    const float count_width = std::max(58.0f, MeasureWidth(count, right) + 18.0f);
+    const D2D1_RECT_F count_badge =
+        D2D1::RectF(width - kPad - count_width, kPad + 3.0f,
+                    width - kPad, kPad + kHeaderHeight - 3.0f);
+    d2d_.FillRoundedRect(count_badge, 8.0f, kAccentSoft);
     d2d_.DrawTextBlock(count, right,
-                       D2D1::RectF(kPad, kPad, width - kPad, kPad + kHeaderHeight),
-                       kTextDim);
+                       D2D1::RectF(count_badge.left + 8.0f, count_badge.top,
+                                   count_badge.right - 8.0f, count_badge.bottom),
+                       kAccent);
     right->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 
     // Fluent search field: a white rounded surface instead of bare text on the
@@ -513,6 +519,15 @@ void MainWindow::DrawFrame() {
                     kPad + kHeaderHeight + kInputHeight);
     d2d_.FillRoundedRect(search, 10.0f, kInputFill);
     d2d_.DrawRoundedBorder(search, 10.0f, kBorder, 1.0f);
+
+    // Small search glyph gives the input field a clear affordance without
+    // taking space away from the query text.
+    const float glyph_cx = kPad + 17.0f;
+    const float glyph_cy = search.top + kInputHeight * 0.5f - 1.0f;
+    d2d_.DrawEllipse(D2D1::Ellipse(D2D1::Point2F(glyph_cx, glyph_cy), 5.0f, 5.0f),
+                     kTextDim, 1.5f);
+    d2d_.DrawLine(D2D1::Point2F(glyph_cx + 3.8f, glyph_cy + 3.8f),
+                  D2D1::Point2F(glyph_cx + 8.0f, glyph_cy + 8.0f), kTextDim, 1.5f);
 
     // Query line with caret.
     const D2D1_RECT_F input = InputRect();

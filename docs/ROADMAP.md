@@ -219,6 +219,18 @@ ALT+L 直接执行最近项；退出后 ini 含 `LatestList`。
 证据：`07-evidence/fluent-ui/settings-winui3-*.png`、`welcome-fluent-210-v3.png`、
 `manager-fluent-210-v2.png`。
 
+## M13 — 全窗口 UI 重构（🔨，2026-11-26）
+
+- [x] 启动器搜索框增加搜索图标，结果数量改为 Fluent 风格徽章，保持可读性与层级
+- [x] 参数确认按钮补齐 hover / pressed / capture 状态，鼠标操作反馈与键盘操作一致
+- [x] 公共 Fluent 绘制修复 GDI 画刷泄漏，避免设置、欢迎页、管理器长期运行后资源增长
+- [x] 首启向导语言选择改为标准下拉控件，减少自绘菜单与整体风格冲突
+- [x] 设置外观页增加显式“应用主题”菜单：跟随 Windows / 浅色 / 深色，并持久化到 `[GUI] Theme`
+- [x] 设置外观页增加皮肤文件选择器、路径显示和 JPG/PNG/BMP 使用提示
+- [ ] 继续统一启动器、参数窗与 WinUI 设置的 DPI 重排、空状态、可访问性名称和完整截图
+
+验收：主程序可启动并显示主窗口；主程序与核心测试构建通过；本轮核心测试为 1134 checks / 0 failure(s)。
+
 ## 后续可选增强（⏳）
 
 - [ ] 管理器窗口尺寸/列宽记忆（原版 `ManWin*`/`ManColWidth*`）
