@@ -18,7 +18,7 @@
 
 M5 外观与系统集成：
 
-| 皮肤背景 | 多语言 | 关于（旧原生窗口） |
+| 皮肤背景 | 多语言 | 关于与路径（WinUI 3） |
 |---|---|---|
 | ![皮肤背景](docs/images/launcher-skin.png) | ![多语言](docs/images/launcher-i18n.png) | ![关于](docs/images/about.png) |
 
