@@ -89,11 +89,6 @@
         <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
       </Style>
-      <Style x:Key="SelectComboBoxStyle" TargetType="ComboBox">
-        <Setter Property="HorizontalAlignment" Value="Stretch" />
-        <Setter Property="MinHeight" Value="40" />
-        <Setter Property="Padding" Value="12,4" />
-      </Style>
       <Style x:Key="PathButtonStyle" TargetType="Button">
         <Setter Property="HorizontalAlignment" Value="Stretch" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -312,12 +307,24 @@
                       <NumberBox x:Name="RadiusBox" Style="{StaticResource FieldStyle}" />
                       <StackPanel Spacing="6">
                         <TextBlock x:Name="LanguageLabel" Style="{StaticResource FieldLabelStyle}" />
-                        <ComboBox x:Name="LanguageCombo" Style="{StaticResource SelectComboBoxStyle}"
-                                  SelectionChanged="OnLanguageSelectionChanged">
-                          <ComboBoxItem Tag="zh_cn" Content="简体中文" />
-                          <ComboBoxItem Tag="zh_hk" Content="繁體中文" />
-                          <ComboBoxItem Tag="en_us" Content="English" />
-                        </ComboBox>
+                        <Button x:Name="LanguageButton" Style="{StaticResource SelectButtonStyle}">
+                          <Button.Flyout>
+                            <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                              <MenuFlyoutItem Tag="zh_cn" Text="简体中文" Click="OnLanguageItemClick" />
+                              <MenuFlyoutItem Tag="zh_hk" Text="繁體中文" Click="OnLanguageItemClick" />
+                              <MenuFlyoutItem Tag="en_us" Text="English" Click="OnLanguageItemClick" />
+                            </MenuFlyout>
+                          </Button.Flyout>
+                          <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="*" />
+                              <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="LanguageButtonText" VerticalAlignment="Center" />
+                            <FontIcon Grid.Column="1" Glyph="&#xE70D;" FontSize="12"
+                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                          </Grid>
+                        </Button>
                       </StackPanel>
                       <StackPanel Spacing="6">
                         <TextBlock x:Name="ThemeLabel" Style="{StaticResource FieldLabelStyle}" />

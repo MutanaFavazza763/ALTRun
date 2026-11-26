@@ -269,7 +269,7 @@ void MainWindow::ApplyLocalization() {
     SetNumberHeader(AlphaBox(), "ConfigForm.LblFormAlpha");
     SetNumberHeader(RadiusBox(), "ConfigForm.lblRoundBorderRadius");
     LanguageLabel().Text(H("ConfigForm.LblLanguage"));
-    UpdateLanguageCombo();
+    UpdateLanguageButton();
     SetTextHeader(BackgroundBox(), "ConfigForm.LblBackGroundImage");
     ThemeLabel().Text(H("resTheme"));
     SkinFileLabel().Text(H("resSkinFile"));
@@ -372,7 +372,7 @@ void MainWindow::LoadSettings() {
     }
     language_index_ = language_index;
     language_value_ = normalized;
-    UpdateLanguageCombo();
+    UpdateLanguageButton();
 
     AboutVersion().Text(hstring(std::wstring(L"2.1.0")));
     const std::wstring ini_path = settings_.ini_path.empty()
@@ -475,22 +475,18 @@ void MainWindow::NotifyMainApp() {
     }
 }
 
-void MainWindow::UpdateLanguageCombo() {
-    if (!LanguageCombo()) {
+void MainWindow::UpdateLanguageButton() {
+    if (!LanguageButtonText()) {
         return;
     }
     const int index = std::clamp(language_index_, 0, 2);
-    LanguageCombo().SelectedIndex(index);
+    LanguageButtonText().Text(hstring(kLanguageNames[index]));
 }
 
-void MainWindow::OnLanguageSelectionChanged(
-    IInspectable const& sender, SelectionChangedEventArgs const&) {
-    auto combo = sender.try_as<ComboBox>();
-    if (!combo) {
-        return;
-    }
-    auto item = combo.SelectedItem().try_as<ComboBoxItem>();
-    if (!item || !item.Tag()) {
+void MainWindow::OnLanguageItemClick(
+    IInspectable const& sender, RoutedEventArgs const&) {
+    auto item = sender.try_as<MenuFlyoutItem>();
+    if (!item) {
         return;
     }
     auto tag = item.Tag();
@@ -502,7 +498,6 @@ void MainWindow::OnLanguageSelectionChanged(
     for (int index = 0; index < 3; ++index) {
         if (value == kLanguageValues[index]) {
             language_index_ = index;
-            language_value_ = value;
             language_value_ = value;
             break;
         }

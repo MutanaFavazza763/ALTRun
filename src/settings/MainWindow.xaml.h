@@ -14,9 +14,8 @@ struct MainWindow : MainWindowT<MainWindow> {
                        Microsoft::UI::Xaml::RoutedEventArgs const&);
     void OnHotkeyKeyDown(winrt::Windows::Foundation::IInspectable const&,
                          Microsoft::UI::Xaml::Input::KeyRoutedEventArgs const&);
-    void OnLanguageSelectionChanged(
-        winrt::Windows::Foundation::IInspectable const&,
-        Microsoft::UI::Xaml::Controls::SelectionChangedEventArgs const&);
+    void OnLanguageItemClick(winrt::Windows::Foundation::IInspectable const&,
+                             Microsoft::UI::Xaml::RoutedEventArgs const&);
     void OnThemeItemClick(winrt::Windows::Foundation::IInspectable const&,
                           Microsoft::UI::Xaml::RoutedEventArgs const&);
     void OnPickSkinClick(winrt::Windows::Foundation::IInspectable const&,
@@ -32,7 +31,7 @@ private:
     void LoadSettings();
     void SaveSettings();
     void ApplyLocalization();
-    void UpdateLanguageCombo();
+    void UpdateLanguageButton();
     void ShowPage(std::wstring const& tag);
     void NotifyMainApp();
 };
