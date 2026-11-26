@@ -3,6 +3,7 @@
 #include <shellapi.h>
 #include <commdlg.h>
 #pragma comment(lib, "comdlg32.lib")
+#pragma comment(lib, "shell32.lib")
 #if __has_include("MainWindow.g.cpp")
 #include "MainWindow.g.cpp"
 #endif
@@ -268,7 +269,7 @@ void MainWindow::ApplyLocalization() {
     SetNumberHeader(AlphaBox(), "ConfigForm.LblFormAlpha");
     SetNumberHeader(RadiusBox(), "ConfigForm.lblRoundBorderRadius");
     LanguageLabel().Text(H("ConfigForm.LblLanguage"));
-    UpdateLanguageButton();
+    UpdateLanguageCombo();
     SetTextHeader(BackgroundBox(), "ConfigForm.LblBackGroundImage");
     ThemeLabel().Text(H("resTheme"));
     SkinFileLabel().Text(H("resSkinFile"));
@@ -295,11 +296,15 @@ void MainWindow::ApplyLocalization() {
     AboutRelatedFilesTitle().Text(H("resRelatedFiles"));
     AboutHint().Text(H("resTraceEnableHint"));
 
-    const hstring copy_tip = H("resCopyPath");
-    ToolTipService::SetToolTip(CopyIniButton(), box_value(copy_tip));
-    ToolTipService::SetToolTip(CopyParamHistoryButton(), box_value(copy_tip));
-    ToolTipService::SetToolTip(CopyShortcutListButton(), box_value(copy_tip));
-    ToolTipService::SetToolTip(CopyFavouriteButton(), box_value(copy_tip));
+    const hstring open_tip = H("resOpenPath");
+    ToolTipService::SetToolTip(AboutIniPathButton(), box_value(open_tip));
+    ToolTipService::SetToolTip(AboutIniFolderButton(), box_value(open_tip));
+    ToolTipService::SetToolTip(AboutParamHistoryButton(), box_value(open_tip));
+    ToolTipService::SetToolTip(AboutParamHistoryFolderButton(), box_value(open_tip));
+    ToolTipService::SetToolTip(AboutShortcutListButton(), box_value(open_tip));
+    ToolTipService::SetToolTip(AboutShortcutListFolderButton(), box_value(open_tip));
+    ToolTipService::SetToolTip(AboutFavouriteListButton(), box_value(open_tip));
+    ToolTipService::SetToolTip(AboutFavouriteListFolderButton(), box_value(open_tip));
 
     CancelButton().Content(box_value(H("Common.BtnCancel")));
     SaveButton().Content(box_value(H("Common.BtnOK")));
@@ -367,7 +372,7 @@ void MainWindow::LoadSettings() {
     }
     language_index_ = language_index;
     language_value_ = normalized;
-    UpdateLanguageButton();
+    UpdateLanguageCombo();
 
     AboutVersion().Text(hstring(std::wstring(L"2.1.0")));
     const std::wstring ini_path = settings_.ini_path.empty()
@@ -375,7 +380,8 @@ void MainWindow::LoadSettings() {
                                      : settings_.ini_path;
     AboutIniPath().Text(hstring(DisplayPath(ini_path)));
     ToolTipService::SetToolTip(AboutIniPath(), box_value(hstring(ini_path)));
-    CopyIniButton().Tag(box_value(hstring(ini_path)));
+    AboutIniPathButton().Tag(box_value(hstring(ini_path)));
+    AboutIniFolderButton().Tag(box_value(hstring(DirectoryOf(ini_path))));
     AboutRunCount().Text(hstring(alt::LocArgInt(
         W("resAboutRunCount"), settings_.shortcut_run_count)));
 
@@ -392,17 +398,20 @@ void MainWindow::LoadSettings() {
     AboutParamHistory().Text(hstring(DisplayPath(param_history)));
     ToolTipService::SetToolTip(AboutParamHistory(),
                                box_value(hstring(param_history)));
-    CopyParamHistoryButton().Tag(box_value(hstring(param_history)));
+    AboutParamHistoryButton().Tag(box_value(hstring(param_history)));
+    AboutParamHistoryFolderButton().Tag(box_value(hstring(DirectoryOf(param_history))));
 
     AboutShortcutList().Text(hstring(DisplayPath(shortcut_list)));
     ToolTipService::SetToolTip(AboutShortcutList(),
                                box_value(hstring(shortcut_list)));
-    CopyShortcutListButton().Tag(box_value(hstring(shortcut_list)));
+    AboutShortcutListButton().Tag(box_value(hstring(shortcut_list)));
+    AboutShortcutListFolderButton().Tag(box_value(hstring(DirectoryOf(shortcut_list))));
 
     AboutFavouriteList().Text(hstring(DisplayPath(favourite_list)));
     ToolTipService::SetToolTip(AboutFavouriteList(),
                                box_value(hstring(favourite_list)));
-    CopyFavouriteButton().Tag(box_value(hstring(favourite_list)));
+    AboutFavouriteListButton().Tag(box_value(hstring(favourite_list)));
+    AboutFavouriteListFolderButton().Tag(box_value(hstring(DirectoryOf(favourite_list))));
 
     AboutTrace().IsOn(settings_.trace_enabled);
 }
@@ -466,18 +475,22 @@ void MainWindow::NotifyMainApp() {
     }
 }
 
-void MainWindow::UpdateLanguageButton() {
-    if (!LanguageButtonText()) {
+void MainWindow::UpdateLanguageCombo() {
+    if (!LanguageCombo()) {
         return;
     }
     const int index = std::clamp(language_index_, 0, 2);
-    LanguageButtonText().Text(hstring(kLanguageNames[index]));
+    LanguageCombo().SelectedIndex(index);
 }
 
-void MainWindow::OnLanguageItemClick(
-    IInspectable const& sender, RoutedEventArgs const&) {
-    auto item = sender.try_as<MenuFlyoutItem>();
-    if (!item) {
+void MainWindow::OnLanguageSelectionChanged(
+    IInspectable const& sender, SelectionChangedEventArgs const&) {
+    auto combo = sender.try_as<ComboBox>();
+    if (!combo) {
+        return;
+    }
+    auto item = combo.SelectedItem().try_as<ComboBoxItem>();
+    if (!item || !item.Tag()) {
         return;
     }
     auto tag = item.Tag();
@@ -490,7 +503,7 @@ void MainWindow::OnLanguageItemClick(
         if (value == kLanguageValues[index]) {
             language_index_ = index;
             language_value_ = value;
-            UpdateLanguageButton();
+            language_value_ = value;
             break;
         }
     }
@@ -533,7 +546,7 @@ void MainWindow::OnPickSkinClick(IInspectable const&, RoutedEventArgs const&) {
     }
 }
 
-void MainWindow::OnCopyPathClick(
+void MainWindow::OnOpenPathClick(
     IInspectable const& sender, RoutedEventArgs const&) {
     auto button = sender.try_as<Button>();
     if (!button) {
@@ -543,10 +556,15 @@ void MainWindow::OnCopyPathClick(
     if (!tag) {
         return;
     }
-    const hstring path = winrt::unbox_value<hstring>(tag);
-    winrt::Windows::ApplicationModel::DataTransfer::DataPackage package;
-    package.SetText(path);
-    winrt::Windows::ApplicationModel::DataTransfer::Clipboard::SetContent(package);
+    std::wstring target = std::wstring(winrt::unbox_value<hstring>(tag));
+    if (::GetFileAttributesW(target.c_str()) == INVALID_FILE_ATTRIBUTES) {
+        target = DirectoryOf(target);
+    }
+    if (target.empty()) {
+        target = ExeDirectory();
+    }
+    ::ShellExecuteW(nullptr, L"open", target.c_str(), nullptr, nullptr,
+                    SW_SHOWNORMAL);
 }
 
 void MainWindow::ShowPage(std::wstring const& tag) {

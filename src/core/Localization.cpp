@@ -159,6 +159,7 @@ constexpr BuiltinText kRewriteBuiltins[] = {
      L"%LOCALAPPDATA%\\ALTRun\\altRun.log。"},
     {"resLabelVersion", L"Version: ", L"版本："},
     {"resCopyPath", L"Copy path", L"复制路径", L"複製路徑"},
+    {"resOpenPath", L"Open path", L"打开路径", L"開啟路徑"},
     {"resAdvancedHint", L"Changes take effect after you click Save.",
      L"修改后点击“确定”保存生效。", L"修改後點擊「確定」儲存生效。"},
     // Shortcut manager: dialogs and buttons the legacy VCL form did not have.

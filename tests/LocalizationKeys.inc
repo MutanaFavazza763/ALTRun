@@ -319,6 +319,7 @@ const char* const kLocalizationKeys[] = {
     "resWelcomeSendTo",
     "resWelcomeStart",
     "resCopyPath",
+    "resOpenPath",
     "resAdvancedHint",
     "resTheme",
     "resThemeSystem",

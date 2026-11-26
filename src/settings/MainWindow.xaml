@@ -89,6 +89,18 @@
         <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
       </Style>
+      <Style x:Key="SelectComboBoxStyle" TargetType="ComboBox">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="Padding" Value="12,4" />
+      </Style>
+      <Style x:Key="PathButtonStyle" TargetType="Button">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+      </Style>
       <Style x:Key="CopyButtonStyle" TargetType="Button">
         <Setter Property="Width" Value="32" />
         <Setter Property="Height" Value="32" />
@@ -101,7 +113,8 @@
       <Style x:Key="FooterButtonStyle" TargetType="Button">
         <Setter Property="MinWidth" Value="96" />
         <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
       </Style>
     </Grid.Resources>
 
@@ -299,24 +312,12 @@
                       <NumberBox x:Name="RadiusBox" Style="{StaticResource FieldStyle}" />
                       <StackPanel Spacing="6">
                         <TextBlock x:Name="LanguageLabel" Style="{StaticResource FieldLabelStyle}" />
-                        <Button x:Name="LanguageButton" Style="{StaticResource SelectButtonStyle}">
-                          <Button.Flyout>
-                            <MenuFlyout Placement="BottomEdgeAlignedLeft">
-                              <MenuFlyoutItem Tag="zh_cn" Text="简体中文" Click="OnLanguageItemClick" />
-                              <MenuFlyoutItem Tag="zh_hk" Text="繁體中文" Click="OnLanguageItemClick" />
-                              <MenuFlyoutItem Tag="en_us" Text="English" Click="OnLanguageItemClick" />
-                            </MenuFlyout>
-                          </Button.Flyout>
-                          <Grid ColumnSpacing="8">
-                            <Grid.ColumnDefinitions>
-                              <ColumnDefinition Width="*" />
-                              <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="LanguageButtonText" VerticalAlignment="Center" />
-                            <FontIcon Grid.Column="1" Glyph="&#xE70D;" FontSize="12"
-                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                          </Grid>
-                        </Button>
+                        <ComboBox x:Name="LanguageCombo" Style="{StaticResource SelectComboBoxStyle}"
+                                  SelectionChanged="OnLanguageSelectionChanged">
+                          <ComboBoxItem Tag="zh_cn" Content="简体中文" />
+                          <ComboBoxItem Tag="zh_hk" Content="繁體中文" />
+                          <ComboBoxItem Tag="en_us" Content="English" />
+                        </ComboBox>
                       </StackPanel>
                       <StackPanel Spacing="6">
                         <TextBlock x:Name="ThemeLabel" Style="{StaticResource FieldLabelStyle}" />
@@ -341,7 +342,7 @@
                       </StackPanel>
                       <StackPanel Spacing="6">
                         <TextBlock x:Name="SkinFileLabel" Style="{StaticResource FieldLabelStyle}" />
-                        <Grid ColumnSpacing="8">
+                        <Grid ColumnSpacing="8" VerticalAlignment="Center">
                           <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -418,11 +419,14 @@
                           <ColumnDefinition Width="*" />
                           <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="AboutIniPath" Style="{StaticResource PathStyle}"
-                                   IsTextSelectionEnabled="True" />
-                        <Button x:Name="CopyIniButton" Grid.Column="1"
-                                Style="{StaticResource CopyButtonStyle}" Click="OnCopyPathClick">
-                          <FontIcon Glyph="&#xE8C8;" FontSize="14" />
+                        <Button x:Name="AboutIniPathButton" Grid.Column="0"
+                                Style="{StaticResource PathButtonStyle}" Click="OnOpenPathClick">
+                          <TextBlock x:Name="AboutIniPath" Style="{StaticResource PathStyle}"
+                                     IsTextSelectionEnabled="True" />
+                        </Button>
+                        <Button x:Name="AboutIniFolderButton" Grid.Column="1"
+                                Style="{StaticResource CopyButtonStyle}" Click="OnOpenPathClick">
+                          <FontIcon Glyph="&#xE838;" FontSize="14" />
                         </Button>
                       </Grid>
                     </StackPanel>
@@ -442,11 +446,14 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                           </Grid.ColumnDefinitions>
-                          <TextBlock x:Name="AboutParamHistory" Style="{StaticResource PathStyle}"
-                                     IsTextSelectionEnabled="True" />
-                          <Button x:Name="CopyParamHistoryButton" Grid.Column="1"
-                                  Style="{StaticResource CopyButtonStyle}" Click="OnCopyPathClick">
-                            <FontIcon Glyph="&#xE8C8;" FontSize="14" />
+                          <Button x:Name="AboutParamHistoryButton" Grid.Column="0"
+                                  Style="{StaticResource PathButtonStyle}" Click="OnOpenPathClick">
+                            <TextBlock x:Name="AboutParamHistory" Style="{StaticResource PathStyle}"
+                                       IsTextSelectionEnabled="True" />
+                          </Button>
+                          <Button x:Name="AboutParamHistoryFolderButton" Grid.Column="1"
+                                  Style="{StaticResource CopyButtonStyle}" Click="OnOpenPathClick">
+                            <FontIcon Glyph="&#xE838;" FontSize="14" />
                           </Button>
                         </Grid>
                       </StackPanel>
@@ -457,11 +464,14 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                           </Grid.ColumnDefinitions>
-                          <TextBlock x:Name="AboutShortcutList" Style="{StaticResource PathStyle}"
-                                     IsTextSelectionEnabled="True" />
-                          <Button x:Name="CopyShortcutListButton" Grid.Column="1"
-                                  Style="{StaticResource CopyButtonStyle}" Click="OnCopyPathClick">
-                            <FontIcon Glyph="&#xE8C8;" FontSize="14" />
+                          <Button x:Name="AboutShortcutListButton" Grid.Column="0"
+                                  Style="{StaticResource PathButtonStyle}" Click="OnOpenPathClick">
+                            <TextBlock x:Name="AboutShortcutList" Style="{StaticResource PathStyle}"
+                                       IsTextSelectionEnabled="True" />
+                          </Button>
+                          <Button x:Name="AboutShortcutListFolderButton" Grid.Column="1"
+                                  Style="{StaticResource CopyButtonStyle}" Click="OnOpenPathClick">
+                            <FontIcon Glyph="&#xE838;" FontSize="14" />
                           </Button>
                         </Grid>
                       </StackPanel>
@@ -472,11 +482,14 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                           </Grid.ColumnDefinitions>
-                          <TextBlock x:Name="AboutFavouriteList" Style="{StaticResource PathStyle}"
-                                     IsTextSelectionEnabled="True" />
-                          <Button x:Name="CopyFavouriteButton" Grid.Column="1"
-                                  Style="{StaticResource CopyButtonStyle}" Click="OnCopyPathClick">
-                            <FontIcon Glyph="&#xE8C8;" FontSize="14" />
+                          <Button x:Name="AboutFavouriteListButton" Grid.Column="0"
+                                  Style="{StaticResource PathButtonStyle}" Click="OnOpenPathClick">
+                            <TextBlock x:Name="AboutFavouriteList" Style="{StaticResource PathStyle}"
+                                       IsTextSelectionEnabled="True" />
+                          </Button>
+                          <Button x:Name="AboutFavouriteListFolderButton" Grid.Column="1"
+                                  Style="{StaticResource CopyButtonStyle}" Click="OnOpenPathClick">
+                            <FontIcon Glyph="&#xE838;" FontSize="14" />
                           </Button>
                         </Grid>
                       </StackPanel>
