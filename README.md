@@ -1,5 +1,7 @@
 # ALTRun（C++ 重写版）
 
+> 当前发布：**2.1.3**（Win64 便携版）。本页截图与功能说明对应当前源码和最新发布包。
+
 > 一个 Windows 快速启动器：按 `Alt + R` 唤出，输入几个字母即可启动程序、打开文件/网址。
 >
 > 本仓库是 [etworker/ALTRun](https://github.com/etworker/ALTRun)（Delphi 2007，2016 年停更）
@@ -8,8 +10,7 @@
 
 ![启动器截图](docs/images/launcher.png)
 
-> 启动器仍由主程序的原生 D2D 绘制；上图是 2.0.6 的布局截图，2.1 只调整了配色，
-> 未重新截取（原因见 `07-evidence/fluent-ui/README.md`）。
+> 启动器由主程序原生 D2D 绘制；搜索框、结果数量徽章、按钮反馈和 Fluent 视觉细节已更新。
 
 参数输入窗（带全局参数历史）：
 
@@ -21,15 +22,15 @@ M5 外观与系统集成：
 |---|---|---|
 | ![皮肤背景](docs/images/launcher-skin.png) | ![多语言](docs/images/launcher-i18n.png) | ![关于](docs/images/about.png) |
 
-设置页已迁到独立的 **WinUI 3** 程序（`ALTRun.Settings.exe`，C++/WinRT），下面是真实运行截图：
+设置页使用独立的 **WinUI 3** 程序（`ALTRun.Settings.exe`，C++/WinRT），下面是真实运行截图：
 
 ![设置-常规](docs/images/settings-winui-general.png)
 
-| 热键页 | 外观页 | 版本与路径 |
+| 热键页 | 外观页（主题/皮肤） | 版本与路径（可打开路径） |
 |---|---|---|
 | ![设置-热键](docs/images/settings-winui-hotkey.png) | ![设置-外观](docs/images/settings-winui-appearance.png) | ![设置-关于](docs/images/settings-winui-about.png) |
 
-首启向导与快捷项管理器仍由主程序的原生 Fluent 控件承载，语言下拉已改成自绘菜单：
+首启向导与快捷项管理器仍由主程序承载；首启向导使用原生语言下拉，设置页保留上一版语言菜单交互：
 
 | 首启向导 | 语言菜单 |
 |---|---|
@@ -52,6 +53,8 @@ M5 外观与系统集成：
 - `ExecuteIfOnlyOne`、输入末尾空格、`;`、`'` 等原版快捷执行方式
 - 设置与关于（`--config`、`--about` 或托盘菜单）：独立 `ALTRun.Settings.exe`，WinUI 3 导航页
   常规 / 热键 / 外观 / 版本与路径，热键按键捕获，保存后通过 `WM_APP+30` 通知主程序立即生效；
+  外观页提供跟随 Windows / 浅色 / 深色主题、皮肤文件选择和对齐的输入控件。
+- 关于页的配置文件、参数历史、快捷项列表和收藏映射路径均可直接点击打开；文件不存在时打开所在目录。
   找不到设置程序或缺 Windows App Runtime 时回退旧的原生设置窗口
 - 快捷项管理器（托盘菜单或 `--manager`）：四列表格增删改、拖拽排序、拖放添加、
   `.lnk` 解析、相对/绝对路径转换、导入/导出，编辑后立即写回 `ShortCutList.txt`
@@ -68,11 +71,11 @@ M5 外观与系统集成：
 - 三种内置语言：`[GUI] Lang=zh_cn` / `zh_hk` / `en_us`，整窗切换
   （5 个窗口 + 托盘 + 默认列表名）；原版 224 键三语言表内置，不再读取外置
   `.lang` 或 `About.<Lang>` 文件，旧 `EN` / `简体中文` 配置自动迁移
-- 首次启动向导：按系统语言预选界面语言、询问随 Windows 启动 / 发送到菜单，
+- 首次启动向导：按系统语言预选界面语言、原生下拉切换语言、询问随 Windows 启动 / 发送到菜单，
   并给出热键、搜索、参数星号和托盘菜单四条用法
 - 结果列表按像素列对齐（不再依赖空格填充），超长名称以省略号截断；12pt/14pt 比例字体均可
 - M5：JPG/PNG/BMP 皮肤、字体串解析、Popup.wav、SendTo 快捷方式、关于窗口
-- M6：1045 项核心单元测试、CTest、GBK 兼容验证、可复现的 win64 便携版打包脚本
+- M6：核心单元测试、CTest、GBK 兼容验证、可复现的 win64 便携版打包脚本；当前验证为 **1137 checks / 0 failure(s)**
 
 ## 构建
 
@@ -122,9 +125,9 @@ src/         源码；应用图标 `ALTRun.ico` + `ALTRun.rc` 也在这里
 
 ## 状态
 
-2.1.0：设置与关于迁到独立的 WinUI 3 程序；首启向导、快捷项管理器和编辑对话框
-统一为浅色 Fluent 视觉；主程序保留原生核心、托盘和启动器。
-里程碑 M0–M11 均已完成，后续增强项见 [ROADMAP.md](docs/ROADMAP.md)。
+2.1.3：在 WinUI 3 设置基础上完成外观主题/皮肤入口、皮肤控件对齐、关于页路径打开，
+并保留首启向导与原生启动器的现有交互。主程序保留原生核心、托盘和 D2D 启动器。
+里程碑 M0–M13 已完成当前计划项，后续增强项见 [ROADMAP.md](docs/ROADMAP.md)。
 
 ## 许可
 
